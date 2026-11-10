@@ -31,6 +31,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QRegularExpressionValidator>
 
 #include <algorithm>
+#include <cstddef>
 #include <string>
 #include <string_view>
 
@@ -211,9 +212,9 @@ void PortraitList::move_row(PortraitRow *row, int offset)
 	const auto it = std::find(rows_.begin(), rows_.end(), row);
 	if (it == rows_.end())
 		return;
-	const auto index = it - rows_.begin();
-	const auto target = index + offset;
-	if (target < 0 || target >= static_cast<decltype(target)>(rows_.size()))
+	const std::ptrdiff_t index = it - rows_.begin();
+	const std::ptrdiff_t target = index + offset;
+	if (target < 0 || target >= static_cast<std::ptrdiff_t>(rows_.size()))
 		return;
 	std::iter_swap(it, rows_.begin() + target);
 	relayout();
