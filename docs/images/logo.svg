@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 256 256" role="img" aria-labelledby="title description">
+  <title id="title">Voice Spotlight</title>
+  <desc id="description">Three tall portrait cards with bust silhouettes. The middle card is lit and raised; the side cards are dim.</desc>
+  <rect x="12" y="12" width="232" height="232" rx="24" fill="#141414"/>
+  <!-- Dim card left -->
+  <rect x="28" y="76" width="56" height="120" rx="10" fill="#2E2E2E"/>
+  <circle cx="56" cy="122" r="13" fill="#4F4F4F"/>
+  <path d="M36 196 a20 30 0 0 1 40 0 z" fill="#4F4F4F"/>
+  <!-- Dim card right -->
+  <rect x="172" y="76" width="56" height="120" rx="10" fill="#2E2E2E"/>
+  <circle cx="200" cy="122" r="13" fill="#4F4F4F"/>
+  <path d="M180 196 a20 30 0 0 1 40 0 z" fill="#4F4F4F"/>
+  <!-- Lit card center -->
+  <rect x="94" y="52" width="68" height="144" rx="12" fill="#F4A340"/>
+  <circle cx="128" cy="106" r="17" fill="#FFF4DC"/>
+  <path d="M102 196 a26 38 0 0 1 52 0 z" fill="#FFF4DC"/>
+  <!-- Speaking indicator -->
+  <rect x="108" y="208" width="40" height="8" rx="4" fill="#F4A340"/>
+</svg>
