@@ -404,6 +404,25 @@ void test_abbreviate_data_uris()
 	CHECK(abbreviate_data_uris("a data: b;base64,QUJD") == "a data: b;base64,QUJD");
 }
 
+void test_check_entries()
+{
+	using P = EntryProblem;
+	// 追加しただけの空の行は読み飛ばす
+	CHECK(check_entries({{"", "", ""}, {"123", "a.png", ""}}).problem == P::None);
+	CHECK(check_entries({}).problem == P::None);
+	// 覚え書きだけの行も、ID と画像が空なら読み飛ばす
+	CHECK(check_entries({{"", "", "memo"}}).problem == P::None);
+
+	const EntryCheck missing_id = check_entries({{"123", "a.png", ""}, {"", "b.png", ""}});
+	CHECK(missing_id.problem == P::MissingUserId && missing_id.index == 1);
+	CHECK(check_entries({{"12a", "a.png", ""}}).problem == P::InvalidUserId);
+	CHECK(check_entries({{"123", "", ""}}).problem == P::MissingImage);
+
+	// 重複は後ろの行を指す
+	const EntryCheck duplicate = check_entries({{"123", "a.png", ""}, {"456", "b.png", ""}, {"123", "c.png", ""}});
+	CHECK(duplicate.problem == P::DuplicateUserId && duplicate.index == 2);
+}
+
 } // namespace
 
 int main()
@@ -430,6 +449,7 @@ int main()
 	test_css_portraits_target_registered_users_only();
 	test_generated_css_in_managed_block();
 	test_abbreviate_data_uris();
+	test_check_entries();
 
 	if (failures > 0) {
 		std::cerr << failures << " check(s) failed\n";

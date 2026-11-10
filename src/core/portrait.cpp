@@ -18,6 +18,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include "portrait.h"
 
+#include <set>
+
 namespace vspot::core {
 
 namespace {
@@ -147,6 +149,25 @@ std::string base64_encode(std::string_view bytes)
 		out += '=';
 	}
 	return out;
+}
+
+EntryCheck check_entries(const std::vector<PortraitEntry> &entries)
+{
+	std::set<std::string_view> seen;
+	for (std::size_t i = 0; i < entries.size(); ++i) {
+		const PortraitEntry &entry = entries[i];
+		if (entry.user_id.empty() && entry.image_path.empty())
+			continue;
+		if (entry.user_id.empty())
+			return {EntryProblem::MissingUserId, i};
+		if (!is_valid_user_id(entry.user_id))
+			return {EntryProblem::InvalidUserId, i};
+		if (!seen.insert(entry.user_id).second)
+			return {EntryProblem::DuplicateUserId, i};
+		if (entry.image_path.empty())
+			return {EntryProblem::MissingImage, i};
+	}
+	return {};
 }
 
 } // namespace vspot::core

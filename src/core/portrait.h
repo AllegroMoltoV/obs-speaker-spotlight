@@ -73,6 +73,34 @@ ImageProblem check_image(std::string_view file_name, std::string_view bytes);
 
 std::string base64_encode(std::string_view bytes);
 
+// ドックの立ち絵の一覧の 1 行。保存とプリセットにはこの形で置き、画像の中身は持たない
+struct PortraitEntry {
+	std::string user_id;
+	std::string image_path;
+	std::string memo;
+
+	bool operator==(const PortraitEntry &other) const
+	{
+		return user_id == other.user_id && image_path == other.image_path && memo == other.memo;
+	}
+};
+
+enum class EntryProblem {
+	None,
+	MissingUserId,   // 画像はあるがユーザー ID が空
+	InvalidUserId,   // ユーザー ID が is_valid_user_id() を通らない
+	DuplicateUserId, // 先の行と同じユーザー ID
+	MissingImage,    // ユーザー ID はあるが画像のファイルが選ばれていない
+};
+
+struct EntryCheck {
+	EntryProblem problem = EntryProblem::None;
+	std::size_t index = 0; // 問題のある行の位置
+};
+
+// 適用の前に一覧の行を確かめ、最初の問題を返す。ユーザー ID も画像も空の行は、追加しただけの行として読み飛ばす
+EntryCheck check_entries(const std::vector<PortraitEntry> &entries);
+
 // 1 人分の立ち絵
 struct Portrait {
 	std::string user_id;

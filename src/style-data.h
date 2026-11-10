@@ -18,6 +18,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #pragma once
 
+#include "core/portrait.h"
 #include "core/style-schema.h"
 
 #include <obs.h>
@@ -29,5 +30,11 @@ core::StyleValues style_from_data(obs_data_t *data, const std::vector<core::Sect
 
 // 設定の値を新しい obs_data にする。呼び出し側が obs_data_release() で返す
 obs_data_t *style_to_data(const core::StyleValues &values);
+
+// 立ち絵の一覧を obs_data の配列から読む。配列の並びが表示の順になる。array が null なら空を返す
+std::vector<core::PortraitEntry> portraits_from_array(obs_data_array_t *array);
+
+// 立ち絵の一覧を新しい obs_data の配列にする。呼び出し側が obs_data_array_release() で返す
+obs_data_array_t *portraits_to_array(const std::vector<core::PortraitEntry> &entries);
 
 } // namespace vspot

@@ -29,6 +29,7 @@ constexpr const char *HAS_PREVIOUS_KEY = "has_previous";
 constexpr const char *PREVIOUS_CSS_KEY = "previous_css";
 constexpr const char *APPLIED_CSS_KEY = "applied_css";
 constexpr const char *STYLE_KEY = "style";
+constexpr const char *PORTRAITS_KEY = "portraits";
 
 // private settings の中の状態のオブジェクトを読み書きする。無ければ作る
 template<typename Fn> void edit_state(obs_source_t *source, Fn &&fn)
@@ -106,6 +107,29 @@ void save_style(obs_source_t *source, const core::StyleValues &values)
 		obs_data_t *style = style_to_data(values);
 		obs_data_set_obj(state, STYLE_KEY, style);
 		obs_data_release(style);
+	});
+}
+
+std::vector<core::PortraitEntry> load_portraits(obs_source_t *source)
+{
+	obs_data_t *priv = obs_source_get_private_settings(source);
+	obs_data_t *state = obs_data_get_obj(priv, STATE_KEY);
+	obs_data_array_t *array = state ? obs_data_get_array(state, PORTRAITS_KEY) : nullptr;
+	std::vector<core::PortraitEntry> entries = portraits_from_array(array);
+	if (array)
+		obs_data_array_release(array);
+	if (state)
+		obs_data_release(state);
+	obs_data_release(priv);
+	return entries;
+}
+
+void save_portraits(obs_source_t *source, const std::vector<core::PortraitEntry> &entries)
+{
+	edit_state(source, [&](obs_data_t *state) {
+		obs_data_array_t *array = portraits_to_array(entries);
+		obs_data_set_array(state, PORTRAITS_KEY, array);
+		obs_data_array_release(array);
 	});
 }
 

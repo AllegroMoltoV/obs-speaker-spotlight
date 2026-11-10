@@ -22,12 +22,19 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include <QComboBox>
 #include <QLabel>
+#include <QPlainTextEdit>
 #include <QPushButton>
+#include <QToolButton>
 #include <QWidget>
 
+#include <optional>
 #include <string>
 
 namespace vspot {
+
+class CollapsibleSection;
+class PortraitList;
+class SettingsPanel;
 
 // 一覧を開くたびに候補を作り直すコンボボックス
 class SourceComboBox : public QComboBox {
@@ -52,24 +59,54 @@ public:
 
 private slots:
 	void on_source_changed();
+	void on_settings_changed();
+	void on_create_source();
 	void on_apply();
 	void on_undo();
+	void on_copy_css();
 	void on_write_css_file();
+	void on_preset_save();
+	void on_preset_load();
+	void on_preset_delete();
 
 private:
+	// 生成した CSS。作れなかったときは css が空で、error に理由を入れる
+	struct BuiltCss {
+		std::optional<std::string> css;
+		QString error;
+	};
+
 	// 選択中のソース。参照を 1 つ持つため、呼び出し側が obs_source_release() で返す
 	obs_source_t *selected_source() const;
+	// 選択中のソースに保存した設定を欄へ写す。ソースが無ければ既定に戻す
+	void load_settings();
+	// 欄の設定と立ち絵の画像のファイルから CSS を作る。画像のファイルはその都度読み直して確かめる
+	BuiltCss build_css() const;
 	// generated を選択中のソースの css の管理範囲に書き、元に戻す先を記録する
 	void write_managed_css(const std::string &generated);
 	void update_view();
+	void update_css_view();
+	void refresh_presets(const QString &select_name = {});
 	void set_status(const QString &message);
 
 	SourceComboBox *source_combo_{nullptr};
+	QPushButton *create_source_button_{nullptr};
 	QLabel *url_warning_label_{nullptr};
+	CollapsibleSection *portraits_section_{nullptr};
+	PortraitList *portraits_{nullptr};
+	SettingsPanel *panel_{nullptr};
+	QWidget *preset_row_{nullptr};
+	QComboBox *preset_combo_{nullptr};
+	QPushButton *preset_load_button_{nullptr};
+	QPushButton *preset_save_button_{nullptr};
+	QPushButton *preset_delete_button_{nullptr};
 	QPushButton *apply_button_{nullptr};
 	QPushButton *undo_button_{nullptr};
-	QPushButton *write_css_file_button_{nullptr};
+	QPushButton *copy_css_button_{nullptr};
 	QLabel *status_label_{nullptr};
+	QToolButton *css_toggle_button_{nullptr};
+	QPlainTextEdit *css_view_{nullptr};
+	QPushButton *write_css_file_button_{nullptr};
 };
 
 } // namespace vspot

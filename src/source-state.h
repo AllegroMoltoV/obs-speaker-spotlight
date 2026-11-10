@@ -18,11 +18,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #pragma once
 
+#include "core/portrait.h"
 #include "core/style-schema.h"
 
 #include <obs.h>
 
 #include <string>
+#include <vector>
 
 namespace vspot {
 
@@ -40,6 +42,10 @@ void clear_apply_record(obs_source_t *source);
 // 見た目の設定。private settings の voice_spotlight の "style" に置く
 core::StyleValues load_style(obs_source_t *source);
 void save_style(obs_source_t *source, const core::StyleValues &values);
+
+// 立ち絵の一覧。private settings の voice_spotlight の "portraits" に置く。画像の中身は置かない
+std::vector<core::PortraitEntry> load_portraits(obs_source_t *source);
+void save_portraits(obs_source_t *source, const std::vector<core::PortraitEntry> &entries);
 
 std::string get_source_url(obs_source_t *source);
 std::string get_source_css(obs_source_t *source);
