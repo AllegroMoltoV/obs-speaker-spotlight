@@ -119,6 +119,10 @@ std::string generate_css(const StyleValues &values, const std::vector<Portrait> 
 	if (!reader.toggle("name_visible")) {
 		css.add(user, "display", "none");
 	} else {
+		// StreamKit のコンテナの line-height: 19px が残るため、インラインの span では大きな文字の背景が
+		// 行の外へはみ出し、立ち絵や隣の参加者に重なる。span 自身の高さで行を取らせる
+		css.add(name, "display", "inline-block");
+		css.add(name, "line-height", "normal");
 		const std::string font = reader.text("name_font");
 		if (!font.empty())
 			css.add(name, "font-family", css_string(font));

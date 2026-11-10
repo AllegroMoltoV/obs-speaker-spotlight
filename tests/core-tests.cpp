@@ -389,6 +389,20 @@ void test_generated_css_in_managed_block()
 	CHECK(inspect_block(*second) == BlockState::Intact);
 }
 
+// 名前の背景が立ち絵や隣の参加者に重ならないよう、表示するときは span に行の高さを取らせる
+void test_name_takes_its_own_line_height()
+{
+	for (const StyleValues &values : {StyleValues{}, max_values()}) {
+		const std::string css = generate_css(values, {});
+		CHECK(css.find("  display: inline-block !important;\n") != std::string::npos);
+		CHECK(css.find("  line-height: normal !important;\n") != std::string::npos);
+	}
+	StyleValues hidden;
+	hidden.numbers["name_visible"] = 0;
+	const std::string css = generate_css(hidden, {});
+	CHECK(css.find("inline-block") == std::string::npos);
+}
+
 void test_abbreviate_data_uris()
 {
 	const std::string image = PNG_BYTES + std::string(3000, 'x');
@@ -448,6 +462,7 @@ int main()
 	test_css_has_no_external_resources();
 	test_css_portraits_target_registered_users_only();
 	test_generated_css_in_managed_block();
+	test_name_takes_its_own_line_height();
 	test_abbreviate_data_uris();
 	test_check_entries();
 
