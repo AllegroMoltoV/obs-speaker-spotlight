@@ -66,6 +66,11 @@ if(ENABLE_TESTS)
   target_compile_features(voice-spotlight-core-tests PRIVATE cxx_std_17)
   target_include_directories(voice-spotlight-core-tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
   add_test(NAME core-tests COMMAND voice-spotlight-core-tests)
+
+  # 生成した CSS をファイルに書き出す道具。ローカルのページで表示を確かめるときに使う
+  add_executable(voice-spotlight-css-dump tests/css-dump.cpp ${CORE_SOURCES})
+  target_compile_features(voice-spotlight-css-dump PRIVATE cxx_std_17)
+  target_include_directories(voice-spotlight-css-dump PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
 endif()
 
 # ビルド直後に cmake --install を実行する (Windows 開発用)

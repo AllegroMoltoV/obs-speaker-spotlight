@@ -66,7 +66,68 @@ std::string to_hex_color(const Rgb &color)
 const std::vector<SectionDef> &voice_sections()
 {
 	// キーは保存とプリセットに使うため、変えるときは古いキーの読み込みも考える
-	static const std::vector<SectionDef> sections = {};
+	static const std::vector<SectionDef> sections = {
+		{"Section.Brightness",
+		 {
+			 {"idle_brightness", ItemKind::Number, "Item.IdleBrightness", 0, 200, 50, "%", {}, {}},
+			 {"speaking_brightness", ItemKind::Number, "Item.SpeakingBrightness", 0, 200, 100, "%", {}, {}},
+			 // 雑音で 0.1 秒ごとに発話と待機が入れ替わることがあるため、既定でも緩やかに切り替える
+			 {"transition_ms", ItemKind::Number, "Item.TransitionTime", 0, 2000, 200, "ms", {}, {}},
+		 }},
+		{"Section.Speaking",
+		 {
+			 {"speaking_border_visible", ItemKind::Toggle, "Item.SpeakingBorderVisible", 0, 1, 1, {}, {}, {}},
+		 }},
+		{"Section.Avatar",
+		 {
+			 {"avatar_height", ItemKind::Number, "Item.AvatarHeight", 20, 600, 150, "px", {}, {}},
+		 }},
+		{"Section.Name",
+		 {
+			 {"name_visible", ItemKind::Toggle, "Item.NameVisible", 0, 1, 1, {}, {}, {}},
+			 {"name_font", ItemKind::Font, "Item.Font", 0, 0, std::nullopt, {}, {}, {{"name_visible", "on"}}},
+			 {"name_size",
+			  ItemKind::Number,
+			  "Item.FontSize",
+			  8,
+			  72,
+			  std::nullopt,
+			  "px",
+			  {},
+			  {{"name_visible", "on"}}},
+			 {"name_color",
+			  ItemKind::Color,
+			  "Item.TextColor",
+			  0,
+			  0,
+			  std::nullopt,
+			  {},
+			  {},
+			  {{"name_visible", "on"}}},
+			 {"name_background",
+			  ItemKind::Color,
+			  "Item.BackgroundColor",
+			  0,
+			  0,
+			  std::nullopt,
+			  {},
+			  {},
+			  {{"name_visible", "on"}}},
+		 }},
+		{"Section.Layout",
+		 {
+			 {"layout_direction",
+			  ItemKind::Choice,
+			  "Item.Direction",
+			  0,
+			  0,
+			  std::nullopt,
+			  {},
+			  {"vertical", "horizontal"},
+			  {}},
+			 {"item_gap", ItemKind::Number, "Item.Gap", 0, 200, 8, "px", {}, {}},
+		 }},
+	};
 	return sections;
 }
 

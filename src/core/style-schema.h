@@ -73,7 +73,7 @@ struct SectionDef {
 	std::vector<ItemDef> items;
 };
 
-// 見た目の設定項目の表。項目はまだ無い
+// 見た目の設定項目の表
 const std::vector<SectionDef> &voice_sections();
 const ItemDef *find_item(const std::vector<SectionDef> &sections, std::string_view key);
 
