@@ -35,6 +35,7 @@ namespace sspot {
 class CollapsibleSection;
 class SettingsPanel;
 class SpeakerForm;
+class SpeakerPreview;
 
 // 一覧を開くたびに候補を作り直すコンボボックス
 class SourceComboBox : public QComboBox {
@@ -94,6 +95,7 @@ private:
 	QLabel *url_warning_label_{nullptr};
 	CollapsibleSection *speaker_section_{nullptr};
 	SpeakerForm *speaker_{nullptr};
+	SpeakerPreview *preview_{nullptr};
 	SettingsPanel *panel_{nullptr};
 	QWidget *preset_row_{nullptr};
 	QComboBox *preset_combo_{nullptr};

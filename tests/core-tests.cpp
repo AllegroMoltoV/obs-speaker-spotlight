@@ -27,6 +27,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "core/style-schema.h"
 #include "core/voice-style.h"
 
+#include <cstdint>
 #include <iostream>
 #include <map>
 #include <optional>
@@ -561,6 +562,60 @@ void test_pending_apply()
 	CHECK(pending.take() == std::optional<std::string>("b"));
 }
 
+// プレビューは CSS と同じ値の読み方を使う。既定値と範囲の外の値の扱いを確かめる
+void test_resolve_look()
+{
+	const VoiceLook defaults = resolve_look(StyleValues{});
+	CHECK(defaults.avatar_height == 150);
+	CHECK(defaults.idle_brightness == 50);
+	CHECK(defaults.speaking_brightness == 100);
+	CHECK(defaults.transition_ms == 200);
+	CHECK(defaults.speaking_border_visible);
+	CHECK(defaults.name_visible);
+	CHECK(defaults.name_font.empty());
+	CHECK(!defaults.name_size && !defaults.name_color && !defaults.name_background);
+
+	StyleValues values = max_values();
+	values.numbers["avatar_height"] = 9999;
+	values.numbers["speaking_border_visible"] = 0;
+	const VoiceLook look = resolve_look(values);
+	CHECK(look.avatar_height == 600);
+	CHECK(look.idle_brightness == 200);
+	CHECK(!look.speaking_border_visible);
+	CHECK(look.name_size == std::optional<int>(72));
+	CHECK(look.name_color == std::optional<Rgb>(Rgb{1, 2, 3}));
+	CHECK(look.name_font.find_first_of("\"();{}@") == std::string::npos);
+}
+
+// CSS の brightness() と同じく、成分に倍率を掛けて 255 で頭打ちにする。1 を超える倍率も扱う
+void test_brighten()
+{
+	CHECK(brighten(200, 50) == 100);
+	CHECK(brighten(40, 50) == 20);
+	CHECK(brighten(200, 100) == 200);
+	CHECK(brighten(100, 0) == 0);
+	CHECK(brighten(100, 150) == 150);
+	CHECK(brighten(200, 200) == 255);
+	CHECK(brighten(255, 200) == 255);
+	CHECK(brighten(1, 50) == 1);
+
+	std::uint32_t pixels[] = {0x80c86428u, 0x00ffffffu};
+	brighten_pixels(pixels, 2, 50);
+	CHECK(pixels[0] == 0x80643214u);
+	// 透明度は変えない
+	CHECK(pixels[1] == 0x00808080u);
+}
+
+// 埋め込めない立ち絵は CSS に出さないため、プレビューでもアバターのまま描く
+void test_portrait_usable()
+{
+	CHECK(portrait_usable(portrait_of(PNG_BYTES)));
+	CHECK(portrait_usable(portrait_of(WEBP_BYTES)));
+	CHECK(!portrait_usable(PortraitImage{ImageFormat::Unknown, base64_encode(PNG_BYTES), 1, 1}));
+	CHECK(!portrait_usable(PortraitImage{ImageFormat::Png, "abc\")", 1, 1}));
+	CHECK(!portrait_usable(PortraitImage{ImageFormat::Png, "", 1, 1}));
+}
+
 // 名前の背景が立ち絵や隣の参加者に重ならないよう、表示するときは span に行の高さを取らせる
 void test_name_takes_its_own_line_height()
 {
@@ -604,6 +659,9 @@ int main()
 	test_update_css();
 	test_update_css_reports_unchanged();
 	test_pending_apply();
+	test_resolve_look();
+	test_brighten();
+	test_portrait_usable();
 	test_name_takes_its_own_line_height();
 
 	if (failures > 0) {

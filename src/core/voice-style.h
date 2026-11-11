@@ -21,14 +21,38 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "portrait.h"
 #include "style-schema.h"
 
+#include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
 
 namespace sspot::core {
 
-// 立ち絵の表示の高さ (px)
-int avatar_height(const StyleValues &values);
+// 設定の値を、CSS とドックのプレビューで使う形に読んだもの。値の解釈をここだけに置く
+struct VoiceLook {
+	int avatar_height = 0;     // 立ち絵とアバターの表示の高さ (px)
+	int idle_brightness = 100; // 待機中の明るさ (%)。CSS の filter: brightness() の 100 倍
+	int speaking_brightness = 100;
+	int transition_ms = 0;
+	bool speaking_border_visible = true;
+	bool name_visible = true;
+	std::string name_font;         // 空なら StreamKit の書体のまま
+	std::optional<int> name_size;  // px。無ければ StreamKit の大きさのまま
+	std::optional<Rgb> name_color; // 無ければ StreamKit の色のまま
+	std::optional<Rgb> name_background;
+};
+
+VoiceLook resolve_look(const StyleValues &values);
+
+// CSS に埋め込める立ち絵のときに true を返す。形式が分からない立ち絵と、base64 に使わない文字を含む立ち絵は使わない
+bool portrait_usable(const PortraitImage &portrait);
+
+// CSS の filter: brightness() と同じく、色の成分に percent / 100 を掛けて 255 で頭打ちにする
+std::uint8_t brighten(std::uint8_t channel, int percent);
+
+// 0xAARRGGBB の画素の並びの RGB に brighten() を掛ける。透明度は変えない
+void brighten_pixels(std::uint32_t *pixels, std::size_t count, int percent);
 
 // 設定の値と 1 人のユーザー ID から、ブラウザーソースの管理範囲に書く CSS を作る。
 // user_id の参加者だけを表示して左上に置き、portrait があればアバターを置き換える。

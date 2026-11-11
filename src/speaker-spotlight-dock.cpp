@@ -26,6 +26,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "settings-widgets.h"
 #include "source-state.h"
 #include "speaker-form.h"
+#include "speaker-preview.h"
 
 #include <obs-module.h>
 #include <plugin-support.h>
@@ -106,6 +107,10 @@ SpeakerSpotlightDock::SpeakerSpotlightDock(QWidget *parent) : QWidget(parent)
 	speaker_ = new SpeakerForm(speaker_section_);
 	speaker_section_->form()->addRow(speaker_);
 
+	auto *preview_section = new CollapsibleSection(text("Section.Preview"), true, content);
+	preview_ = new SpeakerPreview(preview_section);
+	preview_section->form()->addRow(preview_);
+
 	// 見た目の設定
 	panel_ = new SettingsPanel(core::voice_sections(), content);
 
@@ -138,6 +143,7 @@ SpeakerSpotlightDock::SpeakerSpotlightDock(QWidget *parent) : QWidget(parent)
 	layout->addLayout(source_row);
 	layout->addWidget(url_warning_label_);
 	layout->addWidget(speaker_section_);
+	layout->addWidget(preview_section);
 	layout->addWidget(panel_);
 	layout->addWidget(preset_row_);
 	layout->addWidget(status_label_);
@@ -165,6 +171,11 @@ SpeakerSpotlightDock::SpeakerSpotlightDock(QWidget *parent) : QWidget(parent)
 	connect(speaker_, &SpeakerForm::user_id_changed, this, &SpeakerSpotlightDock::on_user_id_changed);
 	connect(speaker_, &SpeakerForm::portrait_changed, this, &SpeakerSpotlightDock::on_portrait_changed);
 	connect(panel_, &SettingsPanel::changed, this, &SpeakerSpotlightDock::on_settings_changed);
+	// プレビューはソースへの反映の待ちと関係なく、操作のたびに描き直す
+	connect(speaker_, &SpeakerForm::portrait_changed, this,
+		[this]() { preview_->set_portrait(speaker_->portrait()); });
+	connect(panel_, &SettingsPanel::changed, this,
+		[this]() { preview_->set_look(core::resolve_look(panel_->values())); });
 	apply_timer_.setSingleShot(true);
 	apply_timer_.setInterval(core::APPLY_DELAY_MS);
 	connect(&apply_timer_, &QTimer::timeout, this, &SpeakerSpotlightDock::flush_pending);
@@ -232,6 +243,8 @@ void SpeakerSpotlightDock::load_settings()
 	panel_->set_values(settings.style);
 	speaker_->set_user_id(settings.user_id);
 	speaker_->set_portrait(settings.portrait);
+	preview_->set_look(core::resolve_look(panel_->values()));
+	preview_->set_portrait(settings.portrait);
 }
 
 void SpeakerSpotlightDock::update_view()
@@ -432,6 +445,7 @@ void SpeakerSpotlightDock::on_preset_load()
 			continue;
 		// 欄に写したうえで、設定を変えたときと同じ経路でソースへ保存する
 		panel_->set_values(preset.values);
+		preview_->set_look(core::resolve_look(panel_->values()));
 		on_settings_changed();
 		set_status(text("Preset.Loaded").arg(name));
 		return;
