@@ -18,75 +18,40 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include "portrait-embed.h"
 
-#include <algorithm>
+#include <utility>
 
 namespace sspot::core {
 
 std::vector<EmbedStep> embed_steps(bool lossy)
 {
 	if (!lossy)
-		return {{200, 100}, {150, 100}, {100, 100}};
-	std::vector<EmbedStep> steps = {{200, WEBP_DEFAULT_QUALITY},
-					{150, WEBP_DEFAULT_QUALITY},
-					{100, WEBP_DEFAULT_QUALITY}};
+		return {{100, 100}, {75, 100}, {50, 100}};
+	std::vector<EmbedStep> steps = {{100, WEBP_DEFAULT_QUALITY},
+					{75, WEBP_DEFAULT_QUALITY},
+					{50, WEBP_DEFAULT_QUALITY}};
 	for (const int quality : {75, 60, 50})
 		if (quality < WEBP_DEFAULT_QUALITY)
-			steps.push_back({100, quality});
+			steps.push_back({50, quality});
 	return steps;
 }
 
-EmbedPlan plan_embedding(std::size_t count, const std::vector<EmbedStep> &steps, const EmbedEncoder &encode)
+EmbedChoice choose_embedding(const std::vector<EmbedStep> &steps, const EmbedEncoder &encode)
 {
-	EmbedPlan plan;
-	if (count == 0)
-		return plan;
-	if (steps.empty()) {
-		plan.problem = EmbedProblem::EncodeFailed;
-		return plan;
-	}
-
-	std::vector<std::size_t> chosen(count, 0);
-	for (std::size_t floor = 0;; ++floor) {
-		plan.images.assign(count, {});
-		std::size_t total = 0;
-		bool total_exceeded = false;
-		for (std::size_t i = 0; i < count; ++i) {
-			std::size_t step = std::max(chosen[i], floor);
-			std::optional<EncodedImage> image;
-			for (; step < steps.size(); ++step) {
-				image = encode(i, steps[step]);
-				if (!image) {
-					plan.problem = EmbedProblem::EncodeFailed;
-					plan.index = i;
-					plan.images.clear();
-					return plan;
-				}
-				if (image->bytes.size() <= MAX_IMAGE_BYTES)
-					break;
-			}
-			if (step == steps.size()) {
-				plan.problem = EmbedProblem::TooLarge;
-				plan.index = i;
-				plan.images.clear();
-				return plan;
-			}
-			chosen[i] = step;
-			// 足し算の桁あふれを避けるため、残りの枠と比べる。超えた時点で次の下限へ進み、残りは書き出さない
-			if (image->bytes.size() > MAX_TOTAL_IMAGE_BYTES - total) {
-				total_exceeded = true;
-				break;
-			}
-			total += image->bytes.size();
-			plan.images[i] = {step, std::move(*image)};
+	EmbedChoice choice;
+	for (std::size_t step = 0; step < steps.size(); ++step) {
+		std::optional<EncodedImage> image = encode(steps[step]);
+		if (!image) {
+			choice.problem = EmbedProblem::EncodeFailed;
+			return choice;
 		}
-		if (!total_exceeded)
-			return plan;
-		if (floor + 1 >= steps.size()) {
-			plan.problem = EmbedProblem::TotalTooLarge;
-			plan.images.clear();
-			return plan;
+		if (image->bytes.size() <= MAX_IMAGE_BYTES) {
+			choice.step_index = step;
+			choice.image = std::move(*image);
+			return choice;
 		}
 	}
+	choice.problem = steps.empty() ? EmbedProblem::EncodeFailed : EmbedProblem::TooLarge;
+	return choice;
 }
 
 } // namespace sspot::core

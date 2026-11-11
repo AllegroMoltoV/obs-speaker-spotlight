@@ -40,4 +40,8 @@ BlockState inspect_block(std::string_view css);
 // 目印が壊れているときは、利用者の CSS を消さないよう std::nullopt を返す。
 std::optional<std::string> replace_block(std::string_view css, std::string_view generated);
 
+// 管理範囲を目印ごと取り除いた css を返す。範囲が無ければ css をそのまま返す。範囲の外の CSS は残す。
+// 目印が壊れているときは std::nullopt を返す
+std::optional<std::string> remove_block(std::string_view css);
+
 } // namespace sspot::core

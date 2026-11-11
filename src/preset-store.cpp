@@ -32,7 +32,6 @@ constexpr const char *FILE_NAME = "presets.json";
 constexpr const char *PRESETS_KEY = "presets";
 constexpr const char *NAME_KEY = "name";
 constexpr const char *VALUES_KEY = "values";
-constexpr const char *PORTRAITS_KEY = "portraits";
 
 } // namespace
 
@@ -57,10 +56,6 @@ std::vector<Preset> load_presets()
 		preset.values = style_from_data(values, core::voice_sections());
 		if (values)
 			obs_data_release(values);
-		obs_data_array_t *portraits = obs_data_get_array(item, PORTRAITS_KEY);
-		preset.portraits = portraits_from_array(portraits);
-		if (portraits)
-			obs_data_array_release(portraits);
 		obs_data_release(item);
 		// 名前の無いものは読み飛ばす
 		if (!preset.name.empty())
@@ -92,9 +87,6 @@ bool save_presets(const std::vector<Preset> &presets)
 		obs_data_t *values = style_to_data(preset.values);
 		obs_data_set_obj(item, VALUES_KEY, values);
 		obs_data_release(values);
-		obs_data_array_t *portraits = portraits_to_array(preset.portraits);
-		obs_data_set_array(item, PORTRAITS_KEY, portraits);
-		obs_data_array_release(portraits);
 		obs_data_array_push_back(array, item);
 		obs_data_release(item);
 	}

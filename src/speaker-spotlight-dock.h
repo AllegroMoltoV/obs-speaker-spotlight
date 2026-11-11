@@ -18,8 +18,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #pragma once
 
-#include "core/portrait-embed.h"
-
 #include <obs.h>
 
 #include <QComboBox>
@@ -27,16 +25,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QPushButton>
 #include <QWidget>
 
-#include <map>
-#include <optional>
-#include <string>
-#include <tuple>
-
 namespace sspot {
 
 class CollapsibleSection;
-class PortraitList;
 class SettingsPanel;
+class SpeakerForm;
 
 // 一覧を開くたびに候補を作り直すコンボボックス
 class SourceComboBox : public QComboBox {
@@ -62,6 +55,8 @@ public:
 private slots:
 	void on_source_changed();
 	void on_settings_changed();
+	void on_user_id_changed();
+	void on_portrait_changed();
 	void on_create_source();
 	void on_apply();
 	void on_preset_save();
@@ -69,21 +64,13 @@ private slots:
 	void on_preset_delete();
 
 private:
-	// 生成した CSS。作れなかったときは css が空で、error に理由を入れる
-	struct BuiltCss {
-		std::optional<std::string> css;
-		QString error;
-	};
-
 	// 選択中のソース。参照を 1 つ持つため、呼び出し側が obs_source_release() で返す
 	obs_source_t *selected_source() const;
 	// 選択中のソースに保存した設定を欄へ写す。ソースが無ければ既定に戻す
 	void load_settings();
-	// 欄の設定と立ち絵の画像のファイルから CSS を作る。画像のファイルはその都度確かめ、縮小して書き出す。
-	// 作れたときは、各行に埋め込んだ画像の大きさを表示する
-	BuiltCss build_css();
-	// generated を選択中のソースの css の管理範囲に書く
-	void write_managed_css(const std::string &generated);
+	// source に保存した設定から CSS を作り、source の css の管理範囲に書く。ユーザー ID が空なら管理範囲を外す。
+	// 欄の操作はそのたびにソースへ保存するため、欄ではなくソースの設定を読む
+	void apply_to_source(obs_source_t *source);
 	void update_view();
 	void refresh_presets(const QString &select_name = {});
 	void set_status(const QString &message);
@@ -91,8 +78,8 @@ private:
 	SourceComboBox *source_combo_{nullptr};
 	QPushButton *create_source_button_{nullptr};
 	QLabel *url_warning_label_{nullptr};
-	CollapsibleSection *portraits_section_{nullptr};
-	PortraitList *portraits_{nullptr};
+	CollapsibleSection *speaker_section_{nullptr};
+	SpeakerForm *speaker_{nullptr};
 	SettingsPanel *panel_{nullptr};
 	QWidget *preset_row_{nullptr};
 	QComboBox *preset_combo_{nullptr};
@@ -101,25 +88,6 @@ private:
 	QPushButton *preset_delete_button_{nullptr};
 	QPushButton *apply_button_{nullptr};
 	QLabel *status_label_{nullptr};
-
-	// 縮小して書き出した画像のキャッシュのキー。元のファイルが変われば更新日時か大きさが変わる
-	struct EmbedKey {
-		QString path;
-		qint64 modified = 0;
-		qint64 size = 0;
-		int target_height = 0;
-		int quality = 0;
-		core::ImageFormat format = core::ImageFormat::Unknown;
-
-		bool operator<(const EmbedKey &other) const
-		{
-			return std::tie(path, modified, size, target_height, quality, format) <
-			       std::tie(other.path, other.modified, other.size, other.target_height, other.quality,
-					other.format);
-		}
-	};
-	// 同じ条件の再適用で縮小と書き出しを繰り返さないためのキャッシュ。直前の build_css() で使った分だけを残す
-	std::map<EmbedKey, core::EncodedImage> embed_cache_;
 };
 
 } // namespace sspot

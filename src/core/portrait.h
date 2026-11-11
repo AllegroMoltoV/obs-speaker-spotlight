@@ -18,19 +18,17 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #pragma once
 
-// 立ち絵の登録と、その入力の検証
+// 立ち絵の画像とユーザー ID の検証
 
 #include <cstddef>
 #include <string>
 #include <string_view>
-#include <vector>
 
 namespace sspot::core {
 
 // 埋め込む画像の大きさの上限。元の画像ではなく、縮小して書き出した後の画像に掛ける。
-// 1 枚の上限は base64 にして約 140 万文字で、Chromium の URL の上限 2,097,152 文字を下回る
+// base64 にして約 140 万文字で、Chromium の URL の上限 2,097,152 文字を下回る
 inline constexpr std::size_t MAX_IMAGE_BYTES = 1048576;
-inline constexpr std::size_t MAX_TOTAL_IMAGE_BYTES = 4194304;
 
 // 元の画像の上限。画素を読む前にファイルの大きさと寸法で確かめ、OBS のメモリを使い切らないようにする
 inline constexpr std::size_t MAX_SOURCE_FILE_BYTES = 50 * 1048576;
@@ -58,6 +56,9 @@ ImageFormat format_from_file_name(std::string_view file_name);
 // data URI に書く MIME タイプ。Unknown では空を返す
 std::string_view mime_type(ImageFormat format);
 
+// mime_type() の逆。知らない MIME タイプでは Unknown を返す
+ImageFormat format_from_mime(std::string_view mime);
+
 enum class ImageProblem {
 	None,
 	UnsupportedExtension, // 拡張子が .png、.jpg、.jpeg のどれでもない
@@ -79,41 +80,12 @@ ImageProblem check_image(std::string_view file_name, std::string_view header);
 
 std::string base64_encode(std::string_view bytes);
 
-// ドックの立ち絵の一覧の 1 行。保存とプリセットにはこの形で置き、画像の中身は持たない
-struct PortraitEntry {
-	std::string user_id;
-	std::string image_path;
-	std::string memo;
-
-	bool operator==(const PortraitEntry &other) const
-	{
-		return user_id == other.user_id && image_path == other.image_path && memo == other.memo;
-	}
-};
-
-enum class EntryProblem {
-	None,
-	MissingUserId,   // 画像はあるがユーザー ID が空
-	InvalidUserId,   // ユーザー ID が is_valid_user_id() を通らない
-	DuplicateUserId, // 先の行と同じユーザー ID
-	MissingImage,    // ユーザー ID はあるが画像のファイルが選ばれていない
-};
-
-struct EntryCheck {
-	EntryProblem problem = EntryProblem::None;
-	std::size_t index = 0; // 問題のある行の位置
-};
-
-// 適用の前に一覧の行を確かめ、最初の問題を返す。ユーザー ID も画像も空の行は、追加しただけの行として読み飛ばす
-EntryCheck check_entries(const std::vector<PortraitEntry> &entries);
-
-// 1 人分の立ち絵
-struct Portrait {
-	std::string user_id;
+// 縮小して書き出した立ち絵の画像。ソースの private settings に保存し、CSS の data URI に埋め込む
+struct PortraitImage {
 	ImageFormat format = ImageFormat::Unknown;
-	std::string base64; // 埋め込む画像を base64 にしたもの
-	int order = 0;      // 表示の順。小さいほど前
-	std::string memo;   // ドックの中だけで使う覚え書きの名前。CSS には出さない
+	std::string base64;
+	int width = 0;
+	int height = 0;
 };
 
 } // namespace sspot::core

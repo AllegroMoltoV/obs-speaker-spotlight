@@ -64,12 +64,13 @@ QString unique_source_name(const QString &base)
 
 } // namespace
 
-CreateSourceDialog::CreateSourceDialog(QWidget *parent) : QDialog(parent)
+CreateSourceDialog::CreateSourceDialog(const QString &initial_url, QWidget *parent) : QDialog(parent)
 {
 	setWindowTitle(text("CreateSource.Title"));
 
 	url_edit_ = new QLineEdit(this);
 	url_edit_->setPlaceholderText(text("CreateSource.UrlPlaceholder"));
+	url_edit_->setText(initial_url);
 
 	warning_label_ = new QLabel(this);
 	warning_label_->setWordWrap(true);

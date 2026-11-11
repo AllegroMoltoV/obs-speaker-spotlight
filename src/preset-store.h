@@ -18,7 +18,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #pragma once
 
-#include "core/portrait.h"
 #include "core/style-schema.h"
 
 #include <string>
@@ -26,10 +25,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 namespace sspot {
 
+// 見た目の設定だけを持つ。ユーザー ID と立ち絵はソースごとの設定のため含めない
 struct Preset {
 	std::string name;
 	core::StyleValues values;
-	std::vector<core::PortraitEntry> portraits; // 画像のファイルのパスだけを持つ
 };
 
 // プラグインの設定のディレクトリの presets.json を読み書きする。ファイルが無ければ空の一覧を返す

@@ -30,15 +30,12 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 namespace sspot {
 
-// ファイルの大きさ、拡張子、先頭のバイト列、寸法を確かめる。画素は読まない
-core::ImageProblem inspect_source_image(const QString &path);
-
 struct LoadedImage {
 	core::ImageProblem problem = core::ImageProblem::None;
 	QImage image;
 };
 
-// inspect_source_image() と同じ検査をしたうえで画素を読む。JPEG の Exif の向きは画素に反映する
+// ファイルの大きさ、拡張子、先頭のバイト列、寸法を確かめたうえで画素を読む。JPEG の Exif の向きは画素に反映する
 LoadedImage load_source_image(const QString &path);
 
 // この環境の Qt が WebP を書き出せるときは WebP、書き出せないときは PNG
@@ -53,5 +50,14 @@ QImage scale_portrait(const QImage &image, int target_height);
 
 // 縮小済みの画像を format で書き出す
 std::optional<core::EncodedImage> write_portrait(const QImage &image, core::ImageFormat format, int quality);
+
+struct EmbedResult {
+	core::ImageProblem image_problem = core::ImageProblem::None; // 元の画像の問題
+	core::EmbedProblem embed_problem = core::EmbedProblem::None; // 書き出しの問題
+	std::optional<core::PortraitImage> portrait;                 // 問題が無いときの、埋め込む画像
+};
+
+// 元の画像を読み、core::EMBED_HEIGHT_LIMIT を基準に core::embed_steps() の段で縮小して書き出す
+EmbedResult embed_portrait_file(const QString &path);
 
 } // namespace sspot

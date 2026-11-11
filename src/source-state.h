@@ -23,20 +23,24 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include <obs.h>
 
+#include <optional>
 #include <string>
-#include <vector>
 
 namespace sspot {
 
-// ブラウザーソースごとの状態は private settings の "speaker_spotlight" に置き、シーンコレクションと一緒に保存される
+// ブラウザーソースごとの設定。private settings の "speaker_spotlight" に置き、シーンコレクションと一緒に保存される。
+// "style" (見た目の設定)、"user_id" (文字列)、"portrait" (立ち絵。無いときはキーを置かない) を持つ
+struct SpeakerSettings {
+	core::StyleValues style;
+	std::string user_id;
+	std::optional<core::PortraitImage> portrait;
+};
 
-// 見た目の設定。private settings の speaker_spotlight の "style" に置く
-core::StyleValues load_style(obs_source_t *source);
+SpeakerSettings load_speaker_settings(obs_source_t *source);
 void save_style(obs_source_t *source, const core::StyleValues &values);
-
-// 立ち絵の一覧。private settings の speaker_spotlight の "portraits" に置く。画像の中身は置かない
-std::vector<core::PortraitEntry> load_portraits(obs_source_t *source);
-void save_portraits(obs_source_t *source, const std::vector<core::PortraitEntry> &entries);
+void save_user_id(obs_source_t *source, const std::string &user_id);
+// 縮小して書き出した画像の base64 と形式と寸法を保存する。nullopt では立ち絵を外す
+void save_portrait(obs_source_t *source, const std::optional<core::PortraitImage> &portrait);
 
 std::string get_source_url(obs_source_t *source);
 std::string get_source_css(obs_source_t *source);

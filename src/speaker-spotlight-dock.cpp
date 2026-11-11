@@ -18,24 +18,18 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include "speaker-spotlight-dock.h"
 
-#include "core/managed-css.h"
-#include "core/portrait.h"
 #include "core/streamkit-url.h"
 #include "core/voice-style.h"
 #include "create-source-dialog.h"
 #include "message-box.h"
-#include "portrait-image.h"
-#include "portrait-list.h"
 #include "preset-store.h"
 #include "settings-widgets.h"
 #include "source-state.h"
+#include "speaker-form.h"
 
 #include <obs-module.h>
 #include <plugin-support.h>
 
-#include <QDateTime>
-#include <QDir>
-#include <QFileInfo>
 #include <QGridLayout>
 #include <QHBoxLayout>
 #include <QInputDialog>
@@ -46,7 +40,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include <algorithm>
 #include <cstring>
-#include <set>
 #include <utility>
 #include <vector>
 
@@ -81,32 +74,6 @@ QString source_name(obs_source_t *source)
 	return QString::fromUtf8(obs_source_get_name(source));
 }
 
-QString entry_problem_text(core::EntryProblem problem)
-{
-	switch (problem) {
-	case core::EntryProblem::None:
-		break;
-	case core::EntryProblem::MissingUserId:
-		return text("Portrait.MissingUserId");
-	case core::EntryProblem::InvalidUserId:
-		return text("Portrait.InvalidUserId").arg(QString::number(core::MAX_USER_ID_DIGITS));
-	case core::EntryProblem::DuplicateUserId:
-		return text("Portrait.DuplicateUserId");
-	case core::EntryProblem::MissingImage:
-		return text("Portrait.MissingImage");
-	}
-	return {};
-}
-
-constexpr std::size_t BYTES_PER_MB = 1048576;
-
-QString embedded_text(const core::EncodedImage &image, const core::EmbedStep &step)
-{
-	const std::size_t kb = std::max<std::size_t>((image.bytes.size() + 512) / 1024, 1);
-	const QString format = image.format == core::ImageFormat::Webp ? QStringLiteral("WebP") : QStringLiteral("PNG");
-	return text("Portrait.Embedded").arg(QString::number(kb), format, QString::number(step.scale_percent / 100.0));
-}
-
 } // namespace
 
 void SourceComboBox::showPopup()
@@ -133,10 +100,10 @@ SpeakerSpotlightDock::SpeakerSpotlightDock(QWidget *parent) : QWidget(parent)
 	url_warning_label_ = new QLabel(content);
 	url_warning_label_->setWordWrap(true);
 
-	// 立ち絵
-	portraits_section_ = new CollapsibleSection(text("Section.Portraits"), true, content);
-	portraits_ = new PortraitList(portraits_section_);
-	portraits_section_->form()->addRow(portraits_);
+	// 表示する人
+	speaker_section_ = new CollapsibleSection(text("Section.Speaker"), true, content);
+	speaker_ = new SpeakerForm(speaker_section_);
+	speaker_section_->form()->addRow(speaker_);
 
 	// 見た目の設定
 	panel_ = new SettingsPanel(core::voice_sections(), content);
@@ -174,7 +141,7 @@ SpeakerSpotlightDock::SpeakerSpotlightDock(QWidget *parent) : QWidget(parent)
 	layout->addWidget(source_label);
 	layout->addLayout(source_row);
 	layout->addWidget(url_warning_label_);
-	layout->addWidget(portraits_section_);
+	layout->addWidget(speaker_section_);
 	layout->addWidget(panel_);
 	layout->addWidget(preset_row_);
 	layout->addLayout(action_row);
@@ -200,7 +167,8 @@ SpeakerSpotlightDock::SpeakerSpotlightDock(QWidget *parent) : QWidget(parent)
 	connect(source_combo_, &SourceComboBox::popup_requested, this, &SpeakerSpotlightDock::refresh_sources);
 	connect(source_combo_, &QComboBox::currentIndexChanged, this, &SpeakerSpotlightDock::on_source_changed);
 	connect(create_source_button_, &QPushButton::clicked, this, &SpeakerSpotlightDock::on_create_source);
-	connect(portraits_, &PortraitList::changed, this, &SpeakerSpotlightDock::on_settings_changed);
+	connect(speaker_, &SpeakerForm::user_id_changed, this, &SpeakerSpotlightDock::on_user_id_changed);
+	connect(speaker_, &SpeakerForm::portrait_changed, this, &SpeakerSpotlightDock::on_portrait_changed);
 	connect(panel_, &SettingsPanel::changed, this, &SpeakerSpotlightDock::on_settings_changed);
 	connect(apply_button_, &QPushButton::clicked, this, &SpeakerSpotlightDock::on_apply);
 	connect(preset_load_button_, &QPushButton::clicked, this, &SpeakerSpotlightDock::on_preset_load);
@@ -256,21 +224,21 @@ obs_source_t *SpeakerSpotlightDock::selected_source() const
 void SpeakerSpotlightDock::load_settings()
 {
 	obs_source_t *source = selected_source();
+	SpeakerSettings settings;
 	if (source) {
-		panel_->set_values(load_style(source));
-		portraits_->set_entries(load_portraits(source));
+		settings = load_speaker_settings(source);
 		obs_source_release(source);
-	} else {
-		panel_->set_values({});
-		portraits_->set_entries({});
 	}
+	panel_->set_values(settings.style);
+	speaker_->set_user_id(settings.user_id);
+	speaker_->set_portrait(settings.portrait);
 }
 
 void SpeakerSpotlightDock::update_view()
 {
 	obs_source_t *source = selected_source();
 	const bool has_source = source != nullptr;
-	portraits_section_->setEnabled(has_source);
+	speaker_section_->setEnabled(has_source);
 	panel_->setEnabled(has_source);
 	preset_row_->setEnabled(has_source);
 	apply_button_->setEnabled(has_source);
@@ -305,14 +273,36 @@ void SpeakerSpotlightDock::on_settings_changed()
 	obs_source_t *source = selected_source();
 	if (source) {
 		save_style(source, panel_->values());
-		save_portraits(source, portraits_->entries());
+		obs_source_release(source);
+	}
+}
+
+void SpeakerSpotlightDock::on_user_id_changed()
+{
+	obs_source_t *source = selected_source();
+	if (source) {
+		save_user_id(source, speaker_->user_id());
+		obs_source_release(source);
+	}
+}
+
+void SpeakerSpotlightDock::on_portrait_changed()
+{
+	obs_source_t *source = selected_source();
+	if (source) {
+		save_portrait(source, speaker_->portrait());
 		obs_source_release(source);
 	}
 }
 
 void SpeakerSpotlightDock::on_create_source()
 {
-	CreateSourceDialog dialog(this);
+	QString url;
+	if (obs_source_t *source = selected_source()) {
+		url = QString::fromStdString(get_source_url(source));
+		obs_source_release(source);
+	}
+	CreateSourceDialog dialog(url, this);
 	if (dialog.exec() != QDialog::Accepted)
 		return;
 
@@ -323,136 +313,31 @@ void SpeakerSpotlightDock::on_create_source()
 	set_status(text("CreateSource.Created"));
 }
 
-SpeakerSpotlightDock::BuiltCss SpeakerSpotlightDock::build_css()
+void SpeakerSpotlightDock::apply_to_source(obs_source_t *source)
 {
-	const std::vector<core::PortraitEntry> entries = portraits_->entries();
-	const core::EntryCheck check = core::check_entries(entries);
-	const auto problem_at = [](std::size_t index, const QString &reason) {
-		return BuiltCss{std::nullopt, text("Portrait.Problem").arg(QString::number(index + 1), reason)};
-	};
-	if (check.problem != core::EntryProblem::None)
-		return problem_at(check.index, entry_problem_text(check.problem));
-
-	struct Source {
-		std::size_t entry = 0;
-		QString path;
-		qint64 modified = 0;
-		qint64 size = 0;
-	};
-	std::vector<Source> sources;
-	for (std::size_t i = 0; i < entries.size(); ++i) {
-		const core::PortraitEntry &entry = entries[i];
-		if (entry.user_id.empty() && entry.image_path.empty())
-			continue;
-		const QString path = QString::fromStdString(entry.image_path);
-		const QFileInfo info(path);
-		if (!info.isFile())
-			return problem_at(i, text("Portrait.NotFound").arg(QDir::toNativeSeparators(path)));
-		// 選んだ後にファイルが差し替えられていることがあるため、選んだときと同じ検査をやり直す
-		const core::ImageProblem problem = inspect_source_image(path);
-		if (problem != core::ImageProblem::None)
-			return problem_at(i, image_problem_text(problem));
-		sources.push_back({i, path, info.lastModified().toMSecsSinceEpoch(), info.size()});
-	}
-
-	const int height = core::avatar_height(panel_->values());
-	const core::ImageFormat format = embed_format();
-	const bool lossy = format == core::ImageFormat::Webp;
-	const std::vector<core::EmbedStep> steps = core::embed_steps(lossy);
-
-	std::set<EmbedKey> used;
-	// 元の画像は大きいことがあるため、読んだ画素は直前の 1 枚だけを持つ
-	std::optional<std::size_t> loaded_index;
-	QImage loaded;
-	core::ImageProblem load_problem = core::ImageProblem::None;
-	const core::EmbedEncoder encode = [&](std::size_t index,
-					      const core::EmbedStep &step) -> std::optional<core::EncodedImage> {
-		const Source &source = sources[index];
-		const int target_height = height * step.scale_percent / 100;
-		const EmbedKey key{source.path,   source.modified,          source.size,
-				   target_height, lossy ? step.quality : 0, format};
-		used.insert(key);
-		if (const auto it = embed_cache_.find(key); it != embed_cache_.end())
-			return it->second;
-		if (loaded_index != index) {
-			LoadedImage result = load_source_image(source.path);
-			if (result.problem != core::ImageProblem::None) {
-				load_problem = result.problem;
-				return std::nullopt;
-			}
-			loaded = std::move(result.image);
-			loaded_index = index;
-		}
-		std::optional<core::EncodedImage> image = encode_portrait(loaded, target_height, format, step.quality);
-		if (image)
-			embed_cache_[key] = *image;
-		return image;
-	};
-	const core::EmbedPlan plan = core::plan_embedding(sources.size(), steps, encode);
-	for (auto it = embed_cache_.begin(); it != embed_cache_.end();)
-		it = used.count(it->first) ? std::next(it) : embed_cache_.erase(it);
-
-	switch (plan.problem) {
-	case core::EmbedProblem::None:
-		break;
-	case core::EmbedProblem::EncodeFailed:
-		return problem_at(sources[plan.index].entry, load_problem != core::ImageProblem::None
-								     ? image_problem_text(load_problem)
-								     : text("Embed.EncodeFailed"));
-	case core::EmbedProblem::TooLarge:
-		return problem_at(sources[plan.index].entry,
-				  text("Embed.TooLarge").arg(QString::number(core::MAX_IMAGE_BYTES / BYTES_PER_MB)));
-	case core::EmbedProblem::TotalTooLarge:
-		return {std::nullopt,
-			text("Embed.TotalTooLarge").arg(QString::number(core::MAX_TOTAL_IMAGE_BYTES / BYTES_PER_MB))};
-	}
-
-	std::vector<core::Portrait> portraits;
-	std::vector<QString> embedded(entries.size());
-	for (std::size_t k = 0; k < sources.size(); ++k) {
-		const core::PortraitEntry &entry = entries[sources[k].entry];
-		const core::EmbeddedImage &chosen = plan.images[k];
-		embedded[sources[k].entry] = embedded_text(chosen.image, steps[chosen.step_index]);
-		core::Portrait portrait;
-		portrait.user_id = entry.user_id;
-		portrait.format = chosen.image.format;
-		portrait.base64 = core::base64_encode(chosen.image.bytes);
-		portrait.order = static_cast<int>(portraits.size());
-		portrait.memo = entry.memo;
-		portraits.push_back(std::move(portrait));
-	}
-	portraits_->set_embedded_texts(embedded);
-	return {core::generate_css(panel_->values(), portraits), {}};
-}
-
-void SpeakerSpotlightDock::write_managed_css(const std::string &generated)
-{
-	obs_source_t *source = selected_source();
-	if (!source) {
-		set_status(text("SourceNotFound"));
-		refresh_sources();
-		return;
-	}
 	const QString name = source_name(source);
+	const SpeakerSettings settings = load_speaker_settings(source);
 	const std::string current = get_source_css(source);
-	const auto updated = core::replace_block(current, generated);
-	if (!updated) {
-		obs_source_release(source);
+	const core::CssUpdate update = core::update_css(current, settings.style, settings.user_id, settings.portrait);
+	switch (update.problem) {
+	case core::CssUpdateProblem::None:
+		break;
+	case core::CssUpdateProblem::BrokenMarkers:
 		set_status(text("Apply.BrokenMarkers"));
 		return;
+	case core::CssUpdateProblem::InvalidUserId:
+		set_status(text("Portrait.InvalidUserId").arg(QString::number(core::MAX_USER_ID_DIGITS)));
+		return;
 	}
-	if (*updated == current) {
-		obs_source_release(source);
+	if (update.css == current) {
 		set_status(text("Apply.Unchanged").arg(name));
 		return;
 	}
 
-	set_source_css(source, *updated);
-	obs_log(LOG_INFO, "applied CSS to browser source '%s' (%zu bytes)", name.toUtf8().constData(), updated->size());
-	obs_source_release(source);
-
-	set_status(text("Apply.Done").arg(name));
-	update_view();
+	set_source_css(source, update.css);
+	obs_log(LOG_INFO, "applied CSS to browser source '%s' (%zu bytes)", name.toUtf8().constData(),
+		update.css.size());
+	set_status(text(settings.user_id.empty() ? "Apply.Removed" : "Apply.Done").arg(name));
 }
 
 void SpeakerSpotlightDock::on_apply()
@@ -463,15 +348,8 @@ void SpeakerSpotlightDock::on_apply()
 		refresh_sources();
 		return;
 	}
+	apply_to_source(source);
 	obs_source_release(source);
-
-	// 見つからない画像や不正な画像があるときは、書き込んだ CSS を変えずに止める
-	const BuiltCss built = build_css();
-	if (!built.css) {
-		set_status(built.error);
-		return;
-	}
-	write_managed_css(*built.css);
 }
 
 void SpeakerSpotlightDock::refresh_presets(const QString &select_name)
@@ -506,9 +384,8 @@ void SpeakerSpotlightDock::on_preset_save()
 		if (!ask_yes_no(this, text("Preset.SaveTitle"), text("Preset.Overwrite").arg(name)))
 			return;
 		it->values = panel_->values();
-		it->portraits = portraits_->entries();
 	} else {
-		presets.push_back(Preset{key, panel_->values(), portraits_->entries()});
+		presets.push_back(Preset{key, panel_->values()});
 	}
 	if (!save_presets(presets)) {
 		set_status(text("Preset.SaveFailed"));
@@ -528,7 +405,6 @@ void SpeakerSpotlightDock::on_preset_load()
 			continue;
 		// 欄に写したうえで、設定を変えたときと同じ経路でソースへ保存する
 		panel_->set_values(preset.values);
-		portraits_->set_entries(preset.portraits);
 		on_settings_changed();
 		set_status(text("Preset.Loaded").arg(name));
 		return;

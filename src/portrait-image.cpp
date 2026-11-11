@@ -66,12 +66,6 @@ core::ImageProblem check_file(const QString &path, QSize *size)
 
 } // namespace
 
-core::ImageProblem inspect_source_image(const QString &path)
-{
-	QSize size;
-	return check_file(path, &size);
-}
-
 LoadedImage load_source_image(const QString &path)
 {
 	QSize size;
@@ -125,13 +119,37 @@ std::optional<core::EncodedImage> write_portrait(const QImage &image, core::Imag
 		writer.setQuality(quality);
 	if (!writer.write(image))
 		return std::nullopt;
-	return core::EncodedImage{format, std::string(bytes.constData(), static_cast<std::size_t>(bytes.size()))};
+	return core::EncodedImage{format, std::string(bytes.constData(), static_cast<std::size_t>(bytes.size())),
+				  image.width(), image.height()};
 }
 
 std::optional<core::EncodedImage> encode_portrait(const QImage &image, int target_height, core::ImageFormat format,
 						  int quality)
 {
 	return write_portrait(scale_portrait(image, target_height), format, quality);
+}
+
+EmbedResult embed_portrait_file(const QString &path)
+{
+	EmbedResult result;
+	const LoadedImage loaded = load_source_image(path);
+	if (loaded.problem != core::ImageProblem::None) {
+		result.image_problem = loaded.problem;
+		return result;
+	}
+	const core::ImageFormat format = embed_format();
+	const core::EmbedChoice choice = core::choose_embedding(
+		core::embed_steps(format == core::ImageFormat::Webp), [&](const core::EmbedStep &step) {
+			return encode_portrait(loaded.image, core::EMBED_HEIGHT_LIMIT * step.scale_percent / 100,
+					       format, step.quality);
+		});
+	if (choice.problem != core::EmbedProblem::None) {
+		result.embed_problem = choice.problem;
+		return result;
+	}
+	result.portrait = core::PortraitImage{choice.image.format, core::base64_encode(choice.image.bytes),
+					      choice.image.width, choice.image.height};
+	return result;
 }
 
 } // namespace sspot

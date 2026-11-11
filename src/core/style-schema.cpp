@@ -114,19 +114,6 @@ const std::vector<SectionDef> &voice_sections()
 			  {},
 			  {{"name_visible", "on"}}},
 		 }},
-		{"Section.Layout",
-		 {
-			 {"layout_direction",
-			  ItemKind::Choice,
-			  "Item.Direction",
-			  0,
-			  0,
-			  std::nullopt,
-			  {},
-			  {"vertical", "horizontal"},
-			  {}},
-			 {"item_gap", ItemKind::Number, "Item.Gap", 0, 200, 8, "px", {}, {}},
-		 }},
 	};
 	return sections;
 }

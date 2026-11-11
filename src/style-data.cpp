@@ -20,14 +20,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 namespace sspot {
 
-namespace {
-
-constexpr const char *USER_ID_KEY = "user_id";
-constexpr const char *IMAGE_PATH_KEY = "image_path";
-constexpr const char *MEMO_KEY = "memo";
-
-} // namespace
-
 core::StyleValues style_from_data(obs_data_t *data, const std::vector<core::SectionDef> &sections)
 {
 	core::StyleValues values;
@@ -68,33 +60,6 @@ obs_data_t *style_to_data(const core::StyleValues &values)
 	for (const auto &[key, value] : values.texts)
 		obs_data_set_string(data, key.c_str(), value.c_str());
 	return data;
-}
-
-std::vector<core::PortraitEntry> portraits_from_array(obs_data_array_t *array)
-{
-	std::vector<core::PortraitEntry> entries;
-	const size_t count = array ? obs_data_array_count(array) : 0;
-	for (size_t i = 0; i < count; ++i) {
-		obs_data_t *item = obs_data_array_item(array, i);
-		entries.push_back({obs_data_get_string(item, USER_ID_KEY), obs_data_get_string(item, IMAGE_PATH_KEY),
-				   obs_data_get_string(item, MEMO_KEY)});
-		obs_data_release(item);
-	}
-	return entries;
-}
-
-obs_data_array_t *portraits_to_array(const std::vector<core::PortraitEntry> &entries)
-{
-	obs_data_array_t *array = obs_data_array_create();
-	for (const auto &entry : entries) {
-		obs_data_t *item = obs_data_create();
-		obs_data_set_string(item, USER_ID_KEY, entry.user_id.c_str());
-		obs_data_set_string(item, IMAGE_PATH_KEY, entry.image_path.c_str());
-		obs_data_set_string(item, MEMO_KEY, entry.memo.c_str());
-		obs_data_array_push_back(array, item);
-		obs_data_release(item);
-	}
-	return array;
 }
 
 } // namespace sspot

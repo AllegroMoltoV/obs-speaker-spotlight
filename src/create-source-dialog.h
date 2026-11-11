@@ -31,7 +31,8 @@ class CreateSourceDialog : public QDialog {
 	Q_OBJECT
 
 public:
-	explicit CreateSourceDialog(QWidget *parent = nullptr);
+	// initial_url は URL の欄の初期値
+	explicit CreateSourceDialog(const QString &initial_url, QWidget *parent = nullptr);
 
 	// 作ったソースの UUID。作らなかったときは空
 	QString created_uuid() const { return created_uuid_; }

@@ -30,7 +30,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 namespace sspot::core {
 
-// 表示の高さに掛ける倍率 (百分率) と、WebP の画質。画質 100 は可逆
+// 埋め込む画像の高さの上限 (px)。表示の高さの上限 600px の 2 倍。
+// 表示の高さを変えても画像を作り直さずに済むよう、表示の高さではなくこの上限を基準に縮小する
+inline constexpr int EMBED_HEIGHT_LIMIT = 1200;
+
+// EMBED_HEIGHT_LIMIT に掛ける倍率 (百分率) と、WebP の画質。画質 100 は可逆
 struct EmbedStep {
 	int scale_percent = 100;
 	int quality = 100;
@@ -43,38 +47,33 @@ struct EmbedStep {
 
 inline constexpr int WEBP_DEFAULT_QUALITY = 90;
 
-// 上限を超えるときに試す順の段。lossy が true (WebP) では倍率を 2、1.5、1 と下げた後に画質を下げる。
+// 上限を超えるときに試す順の段。lossy が true (WebP) では倍率を 1、0.75、0.5 と下げた後に画質を下げる。
 // false (PNG) では画質を持たないため、倍率だけを下げる
 std::vector<EmbedStep> embed_steps(bool lossy);
 
 struct EncodedImage {
 	ImageFormat format = ImageFormat::Unknown;
 	std::string bytes;
+	int width = 0;
+	int height = 0;
 };
 
-// index 番目の画像を step の段で書き出す。書き出せないときは nullopt を返す
-using EmbedEncoder = std::function<std::optional<EncodedImage>(std::size_t index, const EmbedStep &step)>;
+// 画像を step の段で書き出す。書き出せないときは nullopt を返す
+using EmbedEncoder = std::function<std::optional<EncodedImage>(const EmbedStep &step)>;
 
 enum class EmbedProblem {
 	None,
-	EncodeFailed,  // エンコーダーが書き出せなかった
-	TooLarge,      // 最後の段でも 1 枚の上限を超える
-	TotalTooLarge, // 最後の段でも合計の上限を超える
+	EncodeFailed, // エンコーダーが書き出せなかった
+	TooLarge,     // 最後の段でも上限を超える
 };
 
-struct EmbeddedImage {
+struct EmbedChoice {
+	EmbedProblem problem = EmbedProblem::None;
 	std::size_t step_index = 0;
 	EncodedImage image;
 };
 
-struct EmbedPlan {
-	EmbedProblem problem = EmbedProblem::None;
-	std::size_t index = 0; // EncodeFailed と TooLarge で、問題のある画像の位置
-	std::vector<EmbeddedImage> images;
-};
-
-// count 枚の画像の段を選ぶ。各画像は 1 枚の上限に収まる最初の段を使う。合計が上限を超えるときは、
-// 全員の段の下限を 1 段ずつ下げる。下限より前の段に収まっていた画像も、下限の段で書き出し直す
-EmbedPlan plan_embedding(std::size_t count, const std::vector<EmbedStep> &steps, const EmbedEncoder &encode);
+// MAX_IMAGE_BYTES に収まる最初の段で書き出す。収まった段より後の段は書き出さない
+EmbedChoice choose_embedding(const std::vector<EmbedStep> &steps, const EmbedEncoder &encode);
 
 } // namespace sspot::core

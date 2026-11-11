@@ -19,10 +19,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "voice-style.h"
 
 #include "css-builder.h"
+#include "managed-css.h"
 #include "streamkit-dom.h"
 
 #include <algorithm>
-#include <set>
+#include <utility>
 
 namespace sspot::core {
 
@@ -41,22 +42,6 @@ bool is_base64_text(std::string_view text)
 	return !text.empty() && std::all_of(text.begin(), text.end(), is_base64_char);
 }
 
-// CSS に出してよい立ち絵だけを、表示の順に並べて返す
-std::vector<const Portrait *> usable_portraits(const std::vector<Portrait> &portraits)
-{
-	std::vector<const Portrait *> result;
-	std::set<std::string, std::less<>> seen;
-	for (const auto &portrait : portraits) {
-		if (!is_valid_user_id(portrait.user_id) || mime_type(portrait.format).empty() ||
-		    !is_base64_text(portrait.base64) || !seen.insert(portrait.user_id).second)
-			continue;
-		result.push_back(&portrait);
-	}
-	std::stable_sort(result.begin(), result.end(),
-			 [](const Portrait *a, const Portrait *b) { return a->order < b->order; });
-	return result;
-}
-
 } // namespace
 
 int avatar_height(const StyleValues &values)
@@ -64,39 +49,35 @@ int avatar_height(const StyleValues &values)
 	return css::Reader(voice_sections(), values).number("avatar_height").value_or(150);
 }
 
-std::string generate_css(const StyleValues &values, const std::vector<Portrait> &portraits)
+std::string generate_css(const StyleValues &values, std::string_view user_id,
+			 const std::optional<PortraitImage> &portrait)
 {
 	const css::Reader reader(voice_sections(), values);
 	css::CssWriter css;
 
+	const std::string list(sk::LIST);
 	const std::string item(sk::ITEM);
+	const std::string target = sk::item_of_user(user_id);
 	const std::string avatar = css::under(item, sk::AVATAR);
 	const std::string speaking_avatar = css::under(item + std::string(sk::SPEAKING), sk::AVATAR);
 	const std::string user = css::under(item, sk::USER);
 	const std::string name = css::under(user, sk::NAME);
 
 	const int height = avatar_height(values);
-	const bool horizontal = reader.text("layout_direction") == "horizontal";
-	const std::vector<const Portrait *> registered = usable_portraits(portraits);
 
 	css.add(std::string(sk::BODY), "background-color", "rgba(0, 0, 0, 0)");
 
-	// 表示の順を order で指定できるよう、一覧を flex にする。StreamKit の li は高さが 50px に固定され、
-	// img は float で並ぶため、立ち絵の高さに合わせて li も flex にする
-	const std::string list(sk::LIST);
-	css.add(list, "display", "flex");
-	css.add(list, "flex-direction", horizontal ? "row" : "column");
-	css.add(list, "align-items", horizontal ? "flex-end" : "flex-start");
-	css.add(list, "gap", css::px(reader.number("item_gap").value_or(0)));
-
-	css.add(item, "display", "flex");
-	css.add(item, "flex-direction", horizontal ? "column" : "row");
-	css.add(item, "align-items", "center");
-	css.add(item, "gap", "8px");
-	css.add(item, "height", "auto");
-	css.add(item, "margin", "0");
-	// 登録していない参加者は、登録した参加者の後ろに並べる
-	css.add(item, "order", std::to_string(registered.size() + 1));
+	// 1 人だけを残し、一覧の余白を除いて左上に置く。配置と重なり順は OBS のシーンで決める
+	css.add(list, "margin", "0");
+	css.add(list, "padding", "0");
+	css.add(item, "display", "none");
+	// StreamKit の li は高さが 50px に固定され、img は float で並ぶため、立ち絵の高さに合わせて li を flex にする
+	css.add(target, "display", "flex");
+	css.add(target, "flex-direction", "row");
+	css.add(target, "align-items", "center");
+	css.add(target, "gap", "8px");
+	css.add(target, "height", "auto");
+	css.add(target, "margin", "0");
 
 	css.add(avatar, "float", "none");
 	css.add(avatar, "flex-shrink", "0");
@@ -117,7 +98,7 @@ std::string generate_css(const StyleValues &values, const std::vector<Portrait> 
 		css.add(user, "display", "none");
 	} else {
 		// StreamKit のコンテナの line-height: 19px が残るため、インラインの span では大きな文字の背景が
-		// 行の外へはみ出し、立ち絵や隣の参加者に重なる。span 自身の高さで行を取らせる
+		// 行の外へはみ出し、立ち絵に重なる。span 自身の高さで行を取らせる
 		css.add(name, "display", "inline-block");
 		css.add(name, "line-height", "normal");
 		const std::string font = reader.text("name_font");
@@ -131,13 +112,11 @@ std::string generate_css(const StyleValues &values, const std::vector<Portrait> 
 			css.add(name, "background-color", css::rgb_text(*background));
 	}
 
-	for (size_t i = 0; i < registered.size(); ++i) {
-		const Portrait &portrait = *registered[i];
-		const std::string target = sk::item_of_user(portrait.user_id);
+	if (portrait && !mime_type(portrait->format).empty() && is_base64_text(portrait->base64)) {
 		const std::string image = css::under(target, sk::AVATAR);
-		css.add(target, "order", std::to_string(i + 1));
 		css.add(image, "content",
-			"url(\"data:" + std::string(mime_type(portrait.format)) + ";base64," + portrait.base64 + "\")");
+			"url(\"data:" + std::string(mime_type(portrait->format)) + ";base64," + portrait->base64 +
+				"\")");
 		// 立ち絵の縦横比を保つため、幅は高さから決める
 		css.add(image, "width", "auto");
 		css.add(image, "height", css::px(height));
@@ -146,6 +125,22 @@ std::string generate_css(const StyleValues &values, const std::vector<Portrait> 
 	}
 
 	return css.str();
+}
+
+CssUpdate update_css(std::string_view current_css, const StyleValues &values, std::string_view user_id,
+		     const std::optional<PortraitImage> &portrait)
+{
+	std::optional<std::string> updated;
+	if (user_id.empty()) {
+		updated = remove_block(current_css);
+	} else {
+		if (!is_valid_user_id(user_id))
+			return {CssUpdateProblem::InvalidUserId, {}};
+		updated = replace_block(current_css, generate_css(values, user_id, portrait));
+	}
+	if (!updated)
+		return {CssUpdateProblem::BrokenMarkers, {}};
+	return {CssUpdateProblem::None, std::move(*updated)};
 }
 
 } // namespace sspot::core

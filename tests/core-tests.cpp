@@ -135,6 +135,21 @@ void test_replace_ignores_other_plugin_markers()
 	CHECK(count(*result, std::string(BLOCK_BEGIN)) == 1);
 }
 
+void test_remove_block()
+{
+	const std::string before = "/* mine */\n.user { color: blue; }\n";
+	const std::string after = "\n.user2 { color: green; }\n";
+	const std::string block = std::string(BLOCK_BEGIN) + "\n.old {}\n" + std::string(BLOCK_END);
+	const auto removed = remove_block(before + block + after);
+	CHECK(removed.has_value());
+	CHECK(*removed == before + ".user2 { color: green; }\n");
+
+	// 末尾に足した範囲を外すと、足す前の css に戻る
+	CHECK(remove_block(*replace_block(DEFAULT_CSS, ".a {}")) == DEFAULT_CSS);
+	CHECK(remove_block(DEFAULT_CSS) == DEFAULT_CSS);
+	CHECK(!remove_block(DEFAULT_CSS + "\n" + std::string(BLOCK_BEGIN)).has_value());
+}
+
 void test_streamkit_voice_url()
 {
 	CHECK(is_streamkit_voice_url(
@@ -242,6 +257,11 @@ void test_image_format()
 	CHECK(mime_type(detect_image_format(PNG_BYTES)) == "image/png");
 	CHECK(mime_type(detect_image_format(JPEG_BYTES)) == "image/jpeg");
 	CHECK(mime_type(detect_image_format(WEBP_BYTES)) == "image/webp");
+	// 立ち絵は MIME タイプで保存するため、読み戻すと同じ形式になる
+	for (const ImageFormat format : {ImageFormat::Png, ImageFormat::Jpeg, ImageFormat::Webp})
+		CHECK(format_from_mime(mime_type(format)) == format);
+	CHECK(format_from_mime("") == ImageFormat::Unknown);
+	CHECK(format_from_mime("image/gif") == ImageFormat::Unknown);
 }
 
 void test_source_limits()
@@ -260,143 +280,83 @@ void test_source_limits()
 	CHECK(check_source_dimensions(-1, -1) == ImageProblem::Unreadable);
 }
 
-// 段ごとに決まった大きさを返す偽のエンコーダー。sizes[画像の位置][段の位置] のバイト数の画像を返し、呼ばれた組を記録する
+// 段ごとに決まった大きさを返す偽のエンコーダー。sizes[段の位置] のバイト数の画像を返し、呼ばれた段を記録する
 struct FakeEncoder {
-	std::vector<std::vector<std::size_t>> sizes;
+	std::vector<std::size_t> sizes;
 	std::vector<EmbedStep> steps;
-	std::vector<std::pair<std::size_t, std::size_t>> calls;
-	std::optional<std::size_t> failing_index;
+	std::vector<std::size_t> calls;
+	bool failing = false;
 
-	std::optional<EncodedImage> operator()(std::size_t index, const EmbedStep &step)
+	EmbedChoice run()
 	{
-		std::size_t position = 0;
-		while (position < steps.size() && !(steps[position] == step))
-			++position;
-		calls.emplace_back(index, position);
-		if (failing_index == index)
-			return std::nullopt;
-		return EncodedImage{ImageFormat::Webp, std::string(sizes[index][position], 'x')};
+		return choose_embedding(steps, [this](const EmbedStep &step) -> std::optional<EncodedImage> {
+			std::size_t position = 0;
+			while (position < steps.size() && !(steps[position] == step))
+				++position;
+			calls.push_back(position);
+			if (failing)
+				return std::nullopt;
+			return EncodedImage{ImageFormat::Webp, std::string(sizes[position], 'x'), 0, 0};
+		});
 	}
 };
-
-EmbedPlan run_plan(FakeEncoder &fake)
-{
-	return plan_embedding(fake.sizes.size(), fake.steps,
-			      [&fake](std::size_t index, const EmbedStep &step) { return fake(index, step); });
-}
-
-std::vector<std::size_t> chosen_steps(const EmbedPlan &plan)
-{
-	std::vector<std::size_t> result;
-	for (const auto &image : plan.images)
-		result.push_back(image.step_index);
-	return result;
-}
 
 void test_embed_steps()
 {
 	const std::vector<EmbedStep> webp = embed_steps(true);
 	CHECK(webp.size() >= 4);
-	CHECK((webp[0] == EmbedStep{200, WEBP_DEFAULT_QUALITY}));
-	CHECK((webp[1] == EmbedStep{150, WEBP_DEFAULT_QUALITY}));
-	CHECK((webp[2] == EmbedStep{100, WEBP_DEFAULT_QUALITY}));
-	// 倍率を 1 まで下げた後は、倍率を保ったまま画質だけを下げる
+	CHECK((webp[0] == EmbedStep{100, WEBP_DEFAULT_QUALITY}));
+	CHECK((webp[1] == EmbedStep{75, WEBP_DEFAULT_QUALITY}));
+	CHECK((webp[2] == EmbedStep{50, WEBP_DEFAULT_QUALITY}));
+	// 倍率を下げきった後は、倍率を保ったまま画質だけを下げる
 	for (std::size_t i = 3; i < webp.size(); ++i) {
-		CHECK(webp[i].scale_percent == 100);
+		CHECK(webp[i].scale_percent == 50);
 		CHECK(webp[i].quality < webp[i - 1].quality);
 	}
 	const std::vector<EmbedStep> png = embed_steps(false);
 	CHECK(png.size() == 3);
-	CHECK(png[0].scale_percent == 200 && png[1].scale_percent == 150 && png[2].scale_percent == 100);
+	CHECK(png[0].scale_percent == 100 && png[1].scale_percent == 75 && png[2].scale_percent == 50);
+	// 最初の段は、表示の高さの上限 600px の 2 倍で書き出す
+	CHECK(EMBED_HEIGHT_LIMIT * webp[0].scale_percent / 100 == 1200);
 }
 
-void test_embed_plan_per_image()
+void test_choose_embedding()
 {
 	const std::size_t over = MAX_IMAGE_BYTES + 1;
-	FakeEncoder fake;
-	fake.steps = embed_steps(true);
-	const std::size_t last = fake.steps.size() - 1;
-	std::vector<std::size_t> shrinking(fake.steps.size(), over);
-	shrinking[last] = MAX_IMAGE_BYTES;
-	fake.sizes = {
-		std::vector<std::size_t>(fake.steps.size(), 1000), // 最初の段で収まる
-		{over, MAX_IMAGE_BYTES, 10, 10, 10, 10},           // 1.5 倍で上限ちょうどに収まる
-		shrinking,                                         // 最後の段で収まる
-	};
-	fake.sizes[1].resize(fake.steps.size(), 10);
-	const EmbedPlan plan = run_plan(fake);
-	CHECK(plan.problem == EmbedProblem::None);
-	CHECK((chosen_steps(plan) == std::vector<std::size_t>{0, 1, last}));
-	CHECK(plan.images[1].image.bytes.size() == MAX_IMAGE_BYTES);
-	CHECK(plan.images[0].image.format == ImageFormat::Webp);
-	// 収まった画像の、それより後の段は書き出さない
-	for (const auto &[index, position] : fake.calls)
-		CHECK(position <= chosen_steps(plan)[index]);
+	FakeEncoder first;
+	first.steps = embed_steps(true);
+	first.sizes.assign(first.steps.size(), 1000);
+	const EmbedChoice fits = first.run();
+	CHECK(fits.problem == EmbedProblem::None);
+	CHECK(fits.step_index == 0);
+	CHECK(fits.image.format == ImageFormat::Webp);
+	// 収まった段より後の段は書き出さない
+	CHECK((first.calls == std::vector<std::size_t>{0}));
 
-	FakeEncoder too_large = fake;
-	too_large.calls.clear();
-	too_large.sizes[2][last] = over;
-	const EmbedPlan failed = run_plan(too_large);
+	FakeEncoder exact = first;
+	exact.calls.clear();
+	exact.sizes[0] = over;
+	exact.sizes[1] = MAX_IMAGE_BYTES;
+	const EmbedChoice second = exact.run();
+	CHECK(second.problem == EmbedProblem::None);
+	CHECK(second.step_index == 1);
+	CHECK(second.image.bytes.size() == MAX_IMAGE_BYTES);
+
+	FakeEncoder last = first;
+	last.calls.clear();
+	last.sizes.assign(last.steps.size(), over);
+	last.sizes.back() = 10;
+	CHECK(last.run().step_index == last.steps.size() - 1);
+
+	FakeEncoder too_large = first;
+	too_large.sizes.assign(too_large.steps.size(), over);
+	const EmbedChoice failed = too_large.run();
 	CHECK(failed.problem == EmbedProblem::TooLarge);
-	CHECK(failed.index == 2);
-	CHECK(failed.images.empty());
+	CHECK(failed.image.bytes.empty());
 
-	FakeEncoder broken = fake;
-	broken.failing_index = 1;
-	const EmbedPlan not_encoded = run_plan(broken);
-	CHECK(not_encoded.problem == EmbedProblem::EncodeFailed);
-	CHECK(not_encoded.index == 1);
-}
-
-void test_embed_plan_total()
-{
-	FakeEncoder fake;
-	fake.steps = embed_steps(true);
-	const std::size_t count = fake.steps.size();
-	// 5 枚は最初の段で 1 MB に収まるが、合計は 5 MB 近い。2 段目で合計が 4 MB を下回る
-	const std::size_t big = MAX_IMAGE_BYTES - 1000;
-	const std::size_t mid = MAX_TOTAL_IMAGE_BYTES / 5 - 1000;
-	std::vector<std::size_t> row(count, 100);
-	row[0] = big;
-	row[1] = mid;
-	fake.sizes.assign(6, row);
-	// 1 枚だけは最初から小さい
-	fake.sizes[5].assign(count, 100);
-	EmbedPlan plan = run_plan(fake);
-	CHECK(plan.problem == EmbedProblem::None);
-	// 合計の超過では、収まっていた画像も含めて全員を同じ段へ下げる
-	CHECK((chosen_steps(plan) == std::vector<std::size_t>{1, 1, 1, 1, 1, 1}));
-	std::size_t total = 0;
-	for (const auto &image : plan.images)
-		total += image.image.bytes.size();
-	CHECK(total <= MAX_TOTAL_IMAGE_BYTES);
-
-	// 1 枚の上限で先に下げた画像は、全員の下限より後ろの段を保つ
-	fake.sizes[0].assign(count, 100);
-	fake.sizes[0][0] = MAX_IMAGE_BYTES + 1;
-	fake.sizes[0][1] = MAX_IMAGE_BYTES + 1;
-	fake.sizes[0][2] = 10000;
-	fake.calls.clear();
-	plan = run_plan(fake);
-	CHECK(plan.problem == EmbedProblem::None);
-	CHECK((chosen_steps(plan) == std::vector<std::size_t>{2, 1, 1, 1, 1, 1}));
-
-	// 最後の段でも合計が上限を超えるときは止める
-	FakeEncoder heavy;
-	heavy.steps = fake.steps;
-	heavy.sizes.assign(5, std::vector<std::size_t>(count, MAX_IMAGE_BYTES));
-	const EmbedPlan failed = run_plan(heavy);
-	CHECK(failed.problem == EmbedProblem::TotalTooLarge);
-	CHECK(failed.images.empty());
-
-	// 合計がちょうど上限なら収まる
-	FakeEncoder exact;
-	exact.steps = fake.steps;
-	exact.sizes.assign(4, std::vector<std::size_t>(count, MAX_IMAGE_BYTES));
-	CHECK(run_plan(exact).problem == EmbedProblem::None);
-
-	CHECK(plan_embedding(0, fake.steps, [](std::size_t, const EmbedStep &) { return std::nullopt; }).problem ==
-	      EmbedProblem::None);
+	FakeEncoder broken = first;
+	broken.failing = true;
+	CHECK(broken.run().problem == EmbedProblem::EncodeFailed);
 }
 
 void test_base64()
@@ -428,9 +388,11 @@ void test_voice_sections_table()
 	CHECK(!keys.empty());
 }
 
-Portrait portrait_of(const std::string &user_id, const std::string &bytes, int order)
+const std::string USER_ID = "111";
+
+PortraitImage portrait_of(const std::string &bytes)
 {
-	return Portrait{user_id, detect_image_format(bytes), base64_encode(bytes), order, "memo-" + user_id};
+	return PortraitImage{detect_image_format(bytes), base64_encode(bytes), 10, 20};
 }
 
 StyleValues max_values()
@@ -441,44 +403,41 @@ StyleValues max_values()
 			if (item.kind == ItemKind::Number || item.kind == ItemKind::Toggle)
 				values.numbers[std::string(item.key)] = item.max;
 	values.texts["name_font"] = "x\"); } @import url(http://example.com/x.css); a {";
-	values.texts["layout_direction"] = "horizontal";
 	values.colors["name_color"] = Rgb{1, 2, 3};
 	values.colors["name_background"] = Rgb{4, 5, 6};
 	return values;
 }
 
-void test_css_has_no_external_resources()
+size_t count_urls(const std::string &css)
 {
-	const std::vector<Portrait> portraits = {
-		portrait_of("111", PNG_BYTES, 0),
-		portrait_of("222", JPEG_BYTES, 0),
-		// 不正な ID と、base64 でない本文は CSS に出ない
-		portrait_of("1\" ] body{", PNG_BYTES, 0),
-		Portrait{"333", ImageFormat::Png, "abc\") } @import url(http://example.com/y.css", 0, ""},
-	};
-	for (const StyleValues &values : {StyleValues{}, max_values()}) {
-		const std::string css = generate_css(values, portraits);
-		CHECK(css.find("@import") == std::string::npos);
-		CHECK(css.find("body{") == std::string::npos);
-		size_t urls = 0;
-		for (size_t pos = css.find("url("); pos != std::string::npos; pos = css.find("url(", pos + 1)) {
-			++urls;
-			CHECK(css.compare(pos, 16, "url(\"data:image/") == 0);
-		}
-		CHECK(urls == 2);
-	}
-
-	// 縮小して書き出した WebP の立ち絵も、data URI の中に MIME とともに入る
-	const std::vector<Portrait> webp = {portrait_of("444", WEBP_BYTES, 0)};
-	const std::string css = generate_css(StyleValues{}, webp);
-	CHECK(css.find("url(\"data:image/webp;base64," + base64_encode(WEBP_BYTES) + "\")") != std::string::npos);
-	CHECK(css.find("@import") == std::string::npos);
 	size_t urls = 0;
 	for (size_t pos = css.find("url("); pos != std::string::npos; pos = css.find("url(", pos + 1)) {
 		++urls;
 		CHECK(css.compare(pos, 10, "url(\"data:") == 0);
 	}
-	CHECK(urls == 1);
+	return urls;
+}
+
+void test_css_has_no_external_resources()
+{
+	for (const StyleValues &values : {StyleValues{}, max_values()}) {
+		for (const std::string &bytes : {PNG_BYTES, JPEG_BYTES, WEBP_BYTES}) {
+			const std::string css = generate_css(values, USER_ID, portrait_of(bytes));
+			CHECK(css.find("@import") == std::string::npos);
+			CHECK(count_urls(css) == 1);
+			// 保存した形式の MIME タイプで埋め込む
+			CHECK(css.find("url(\"data:" + std::string(mime_type(detect_image_format(bytes))) + ";base64," +
+				       base64_encode(bytes) + "\")") != std::string::npos);
+		}
+		// base64 でない本文と、形式の分からない画像は CSS に出さない
+		const PortraitImage injected{ImageFormat::Png, "abc\") } @import url(http://example.com/y.css", 1, 1};
+		const PortraitImage unknown{ImageFormat::Unknown, base64_encode(PNG_BYTES), 1, 1};
+		for (const PortraitImage &bad : {injected, unknown}) {
+			const std::string css = generate_css(values, USER_ID, bad);
+			CHECK(css.find("@import") == std::string::npos);
+			CHECK(count_urls(css) == 0);
+		}
+	}
 }
 
 // 宣言 property を含む規則のセレクターをすべて返す
@@ -495,82 +454,83 @@ std::vector<std::string> selectors_with(const std::string &css, const std::strin
 	return result;
 }
 
-void test_css_portraits_target_registered_users_only()
+// 規則 selector の本文
+std::string rule_of(const std::string &css, const std::string &selector)
 {
-	const std::vector<Portrait> portraits = {
-		portrait_of("222", JPEG_BYTES, 5),
-		portrait_of("111", PNG_BYTES, 1),
-		// 同じ ID の 2 つ目は使わない
-		portrait_of("111", JPEG_BYTES, 0),
-	};
-	const std::string css = generate_css(StyleValues{}, portraits);
-
-	const std::vector<std::string> expected = {".voice_state[data-userid=\"111\"] .voice_avatar",
-						   ".voice_state[data-userid=\"222\"] .voice_avatar"};
-	CHECK(selectors_with(css, "content") == expected);
-	CHECK(css.find("url(\"data:image/png;base64," + base64_encode(PNG_BYTES) + "\")") != std::string::npos);
-	CHECK(css.find("url(\"data:image/jpeg;base64," + base64_encode(JPEG_BYTES) + "\")") != std::string::npos);
-	// 明るさの切り替えは、登録の有無にかかわらず全員の img に掛かる
-	CHECK(selectors_with(css, "filter") ==
-	      (std::vector<std::string>{".voice_state .voice_avatar", ".voice_state.wrapper_speaking .voice_avatar"}));
-	// 表示の順は order の小さい順に 1 から振り、登録していない参加者を最後に置く
-	CHECK(css.find(".voice_state[data-userid=\"111\"] {\n  order: 1 !important;") != std::string::npos);
-	CHECK(css.find(".voice_state[data-userid=\"222\"] {\n  order: 2 !important;") != std::string::npos);
-	CHECK(css.find("order: 3 !important;") != std::string::npos);
-
-	const std::string without = generate_css(StyleValues{}, {});
-	CHECK(selectors_with(without, "content").empty());
-	CHECK(without.find("data-userid") == std::string::npos);
+	const size_t start = css.find(selector + " {\n");
+	if (start == std::string::npos)
+		return {};
+	return css.substr(start, css.find("}\n", start) - start);
 }
 
-void test_generated_css_in_managed_block()
+void test_css_shows_only_registered_user()
+{
+	const std::string css = generate_css(StyleValues{}, USER_ID, portrait_of(PNG_BYTES));
+	const std::string target = ".voice_state[data-userid=\"111\"]";
+	// 登録した 1 人以外の li を隠し、その 1 人だけを表示する
+	CHECK(rule_of(css, ".voice_state").find("display: none !important;") != std::string::npos);
+	CHECK(rule_of(css, target).find("display: flex !important;") != std::string::npos);
+	CHECK(selectors_with(css, "content") == std::vector<std::string>{target + " .voice_avatar"});
+	// 明るさの切り替えは、立ち絵の有無にかかわらず img に掛かる
+	CHECK(selectors_with(css, "filter") ==
+	      (std::vector<std::string>{".voice_state .voice_avatar", ".voice_state.wrapper_speaking .voice_avatar"}));
+	// 並べ方の規則は出さない
+	CHECK(selectors_with(css, "order").empty());
+
+	// 立ち絵が無くても、登録した 1 人だけを表示する
+	const std::string without = generate_css(StyleValues{}, USER_ID);
+	CHECK(selectors_with(without, "content").empty());
+	CHECK(rule_of(without, ".voice_state").find("display: none !important;") != std::string::npos);
+	CHECK(rule_of(without, target).find("display: flex !important;") != std::string::npos);
+}
+
+void test_update_css()
 {
 	const std::string before = DEFAULT_CSS + "\n/* mine */\n.voice_state { outline: 1px solid red; }\n";
 	const std::string after = "\n.mine-after { color: blue; }\n";
-	const auto first = replace_block(before + std::string(BLOCK_BEGIN) + "\n" + std::string(BLOCK_END) + after,
-					 generate_css(StyleValues{}, {portrait_of("111", PNG_BYTES, 0)}));
-	CHECK(first.has_value());
-	const auto second = replace_block(*first, generate_css(max_values(), {portrait_of("222", JPEG_BYTES, 0)}));
-	CHECK(second.has_value());
-	CHECK(second->rfind(before, 0) == 0);
-	CHECK(second->size() >= after.size() &&
-	      second->compare(second->size() - after.size(), after.size(), after) == 0);
-	CHECK(second->find("data-userid=\"111\"") == std::string::npos);
-	CHECK(second->find("data-userid=\"222\"") != std::string::npos);
-	CHECK(inspect_block(*second) == BlockState::Intact);
+	const std::string empty_block = std::string(BLOCK_BEGIN) + "\n" + std::string(BLOCK_END);
+	const CssUpdate first =
+		update_css(before + empty_block + after, StyleValues{}, USER_ID, portrait_of(PNG_BYTES));
+	CHECK(first.problem == CssUpdateProblem::None);
+	const CssUpdate second = update_css(first.css, max_values(), "222", std::nullopt);
+	CHECK(second.problem == CssUpdateProblem::None);
+	CHECK(second.css.rfind(before, 0) == 0);
+	CHECK(second.css.size() >= after.size() &&
+	      second.css.compare(second.css.size() - after.size(), after.size(), after) == 0);
+	CHECK(second.css.find("data-userid=\"111\"") == std::string::npos);
+	CHECK(second.css.find("data-userid=\"222\"") != std::string::npos);
+	CHECK(inspect_block(second.css) == BlockState::Intact);
+
+	// ID が未入力なら管理範囲を外し、範囲の外の CSS は残す
+	const CssUpdate removed = update_css(second.css, StyleValues{}, "", portrait_of(PNG_BYTES));
+	CHECK(removed.problem == CssUpdateProblem::None);
+	CHECK(inspect_block(removed.css) == BlockState::Absent);
+	CHECK(removed.css.rfind(before, 0) == 0);
+	CHECK(removed.css.find(".mine-after { color: blue; }") != std::string::npos);
+	CHECK(removed.css.find("data-userid") == std::string::npos);
+	// 範囲が無ければ何も変えない
+	CHECK(update_css(DEFAULT_CSS, StyleValues{}, "", std::nullopt).css == DEFAULT_CSS);
+
+	// 目印が壊れているときと、ID が不正なときは書かない
+	const std::string broken = DEFAULT_CSS + "\n" + std::string(BLOCK_END);
+	CHECK(update_css(broken, StyleValues{}, USER_ID, std::nullopt).problem == CssUpdateProblem::BrokenMarkers);
+	CHECK(update_css(broken, StyleValues{}, "", std::nullopt).problem == CssUpdateProblem::BrokenMarkers);
+	CHECK(update_css(DEFAULT_CSS, StyleValues{}, "1\" ] body{", std::nullopt).problem ==
+	      CssUpdateProblem::InvalidUserId);
 }
 
 // 名前の背景が立ち絵や隣の参加者に重ならないよう、表示するときは span に行の高さを取らせる
 void test_name_takes_its_own_line_height()
 {
 	for (const StyleValues &values : {StyleValues{}, max_values()}) {
-		const std::string css = generate_css(values, {});
+		const std::string css = generate_css(values, USER_ID);
 		CHECK(css.find("  display: inline-block !important;\n") != std::string::npos);
 		CHECK(css.find("  line-height: normal !important;\n") != std::string::npos);
 	}
 	StyleValues hidden;
 	hidden.numbers["name_visible"] = 0;
-	const std::string css = generate_css(hidden, {});
+	const std::string css = generate_css(hidden, USER_ID);
 	CHECK(css.find("inline-block") == std::string::npos);
-}
-
-void test_check_entries()
-{
-	using P = EntryProblem;
-	// 追加しただけの空の行は読み飛ばす
-	CHECK(check_entries({{"", "", ""}, {"123", "a.png", ""}}).problem == P::None);
-	CHECK(check_entries({}).problem == P::None);
-	// 覚え書きだけの行も、ID と画像が空なら読み飛ばす
-	CHECK(check_entries({{"", "", "memo"}}).problem == P::None);
-
-	const EntryCheck missing_id = check_entries({{"123", "a.png", ""}, {"", "b.png", ""}});
-	CHECK(missing_id.problem == P::MissingUserId && missing_id.index == 1);
-	CHECK(check_entries({{"12a", "a.png", ""}}).problem == P::InvalidUserId);
-	CHECK(check_entries({{"123", "", ""}}).problem == P::MissingImage);
-
-	// 重複は後ろの行を指す
-	const EntryCheck duplicate = check_entries({{"123", "a.png", ""}, {"456", "b.png", ""}, {"123", "c.png", ""}});
-	CHECK(duplicate.problem == P::DuplicateUserId && duplicate.index == 2);
 }
 
 } // namespace
@@ -584,6 +544,7 @@ int main()
 	test_replace_twice_keeps_single_block();
 	test_replace_refuses_broken_markers();
 	test_replace_ignores_other_plugin_markers();
+	test_remove_block();
 	test_streamkit_voice_url();
 	test_hex_color();
 	test_sanitize();
@@ -593,15 +554,13 @@ int main()
 	test_image_format();
 	test_source_limits();
 	test_embed_steps();
-	test_embed_plan_per_image();
-	test_embed_plan_total();
+	test_choose_embedding();
 	test_base64();
 	test_voice_sections_table();
 	test_css_has_no_external_resources();
-	test_css_portraits_target_registered_users_only();
-	test_generated_css_in_managed_block();
+	test_css_shows_only_registered_user();
+	test_update_css();
 	test_name_takes_its_own_line_height();
-	test_check_entries();
 
 	if (failures > 0) {
 		std::cerr << failures << " check(s) failed\n";

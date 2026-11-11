@@ -26,7 +26,12 @@ namespace {
 
 constexpr const char *STATE_KEY = "speaker_spotlight";
 constexpr const char *STYLE_KEY = "style";
-constexpr const char *PORTRAITS_KEY = "portraits";
+constexpr const char *USER_ID_KEY = "user_id";
+constexpr const char *PORTRAIT_KEY = "portrait";
+constexpr const char *MIME_KEY = "mime";
+constexpr const char *BASE64_KEY = "base64";
+constexpr const char *WIDTH_KEY = "width";
+constexpr const char *HEIGHT_KEY = "height";
 
 // private settings の中の状態のオブジェクトを読み書きする。無ければ作る
 template<typename Fn> void edit_state(obs_source_t *source, Fn &&fn)
@@ -49,20 +54,40 @@ std::string get_string_setting(obs_source_t *source, const char *key)
 	return value;
 }
 
+std::optional<core::PortraitImage> portrait_from_data(obs_data_t *data)
+{
+	if (!data)
+		return std::nullopt;
+	core::PortraitImage portrait;
+	portrait.format = core::format_from_mime(obs_data_get_string(data, MIME_KEY));
+	portrait.base64 = obs_data_get_string(data, BASE64_KEY);
+	portrait.width = static_cast<int>(obs_data_get_int(data, WIDTH_KEY));
+	portrait.height = static_cast<int>(obs_data_get_int(data, HEIGHT_KEY));
+	if (portrait.format == core::ImageFormat::Unknown || portrait.base64.empty())
+		return std::nullopt;
+	return portrait;
+}
+
 } // namespace
 
-core::StyleValues load_style(obs_source_t *source)
+SpeakerSettings load_speaker_settings(obs_source_t *source)
 {
+	SpeakerSettings settings;
 	obs_data_t *priv = obs_source_get_private_settings(source);
 	obs_data_t *state = obs_data_get_obj(priv, STATE_KEY);
 	obs_data_t *style = state ? obs_data_get_obj(state, STYLE_KEY) : nullptr;
-	const core::StyleValues values = style_from_data(style, core::voice_sections());
+	obs_data_t *portrait = state ? obs_data_get_obj(state, PORTRAIT_KEY) : nullptr;
+	settings.style = style_from_data(style, core::voice_sections());
+	settings.user_id = state ? obs_data_get_string(state, USER_ID_KEY) : "";
+	settings.portrait = portrait_from_data(portrait);
+	if (portrait)
+		obs_data_release(portrait);
 	if (style)
 		obs_data_release(style);
 	if (state)
 		obs_data_release(state);
 	obs_data_release(priv);
-	return values;
+	return settings;
 }
 
 void save_style(obs_source_t *source, const core::StyleValues &values)
@@ -74,26 +99,25 @@ void save_style(obs_source_t *source, const core::StyleValues &values)
 	});
 }
 
-std::vector<core::PortraitEntry> load_portraits(obs_source_t *source)
+void save_user_id(obs_source_t *source, const std::string &user_id)
 {
-	obs_data_t *priv = obs_source_get_private_settings(source);
-	obs_data_t *state = obs_data_get_obj(priv, STATE_KEY);
-	obs_data_array_t *array = state ? obs_data_get_array(state, PORTRAITS_KEY) : nullptr;
-	std::vector<core::PortraitEntry> entries = portraits_from_array(array);
-	if (array)
-		obs_data_array_release(array);
-	if (state)
-		obs_data_release(state);
-	obs_data_release(priv);
-	return entries;
+	edit_state(source, [&](obs_data_t *state) { obs_data_set_string(state, USER_ID_KEY, user_id.c_str()); });
 }
 
-void save_portraits(obs_source_t *source, const std::vector<core::PortraitEntry> &entries)
+void save_portrait(obs_source_t *source, const std::optional<core::PortraitImage> &portrait)
 {
 	edit_state(source, [&](obs_data_t *state) {
-		obs_data_array_t *array = portraits_to_array(entries);
-		obs_data_set_array(state, PORTRAITS_KEY, array);
-		obs_data_array_release(array);
+		if (!portrait) {
+			obs_data_erase(state, PORTRAIT_KEY);
+			return;
+		}
+		obs_data_t *data = obs_data_create();
+		obs_data_set_string(data, MIME_KEY, std::string(core::mime_type(portrait->format)).c_str());
+		obs_data_set_string(data, BASE64_KEY, portrait->base64.c_str());
+		obs_data_set_int(data, WIDTH_KEY, portrait->width);
+		obs_data_set_int(data, HEIGHT_KEY, portrait->height);
+		obs_data_set_obj(state, PORTRAIT_KEY, data);
+		obs_data_release(data);
 	});
 }
 

@@ -19,7 +19,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 // 立ち絵の縮小と書き出しの大きさと処理時間を計る。プラグインと同じ src/portrait-image.cpp を使う。
 // 使い方: speaker-spotlight-image-bench <画像のパスの一覧> [<見た目の確認用の出力先>]
 // 一覧は UTF-8 で 1 行 1 枚。出力には画像を「サンプル 1」からの番号だけで示し、パスとファイル名を書かない。
-// 出力先を渡すと、表示の高さ 150px の 2 倍に縮小した WebP を、WEBP_DEFAULT_QUALITY と 100 で sample-<番号>-q<画質>.webp に書く。
+// 出力先を渡すと、EMBED_HEIGHT_LIMIT に縮小した WebP を、WEBP_DEFAULT_QUALITY と 100 で sample-<番号>-q<画質>.webp に書く。
 // Qt の imageformats のプラグイン (qwebp、qjpeg) を読めるよう、QT_PLUGIN_PATH に Qt の plugins を渡して実行する
 
 #include "core/portrait-embed.h"
@@ -36,7 +36,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include <algorithm>
 #include <cstdio>
-#include <map>
 #include <optional>
 #include <string>
 #include <utility>
@@ -47,8 +46,7 @@ using namespace sspot;
 namespace {
 
 constexpr int REPEAT = 3;
-constexpr int HEIGHTS[] = {150, 600};
-constexpr int SCALES[] = {200, 150, 100};
+constexpr int SCALES[] = {100, 75, 50};
 
 struct Config {
 	const char *name;
@@ -106,19 +104,15 @@ QImage decode(const core::EncodedImage &image)
 	return QImage::fromData(QByteArray(image.bytes.data(), static_cast<qsizetype>(image.bytes.size())));
 }
 
-using StepSizes = std::map<std::pair<int, std::size_t>, std::size_t>;
-
 // 計測で求めた段ごとの大きさを返す偽のエンコーダーで、プラグインと同じ段の選び方を模擬する
-core::EmbedPlan simulate(const std::vector<const StepSizes *> &samples, int display,
-			 const std::vector<core::EmbedStep> &steps, core::ImageFormat format)
+core::EmbedChoice simulate(const std::vector<std::size_t> &sizes, const std::vector<core::EmbedStep> &steps,
+			   core::ImageFormat format)
 {
-	return core::plan_embedding(
-		samples.size(), steps,
-		[&](std::size_t index, const core::EmbedStep &step) -> std::optional<core::EncodedImage> {
-			const auto position =
-				static_cast<std::size_t>(std::find(steps.begin(), steps.end(), step) - steps.begin());
-			return core::EncodedImage{format, std::string(samples[index]->at({display, position}), 'x')};
-		});
+	return core::choose_embedding(steps, [&](const core::EmbedStep &step) -> std::optional<core::EncodedImage> {
+		const auto position =
+			static_cast<std::size_t>(std::find(steps.begin(), steps.end(), step) - steps.begin());
+		return core::EncodedImage{format, std::string(sizes[position], 'x'), 0, 0};
+	});
 }
 
 } // namespace
@@ -148,9 +142,9 @@ int main(int argc, char **argv)
 	std::printf("embed format\t%s\n", std::string(core::mime_type(format)).c_str());
 	std::printf("default quality\t%d\n", core::WEBP_DEFAULT_QUALITY);
 
-	std::printf("\n[measure]\nsample\tfile_bytes\twidth\theight\talpha\tload_ms\tdisplay\tscale\tout_w\tout_h\t"
+	std::printf("\n[measure]\nsample\tfile_bytes\twidth\theight\talpha\tload_ms\tlimit\tscale\tout_w\tout_h\t"
 		    "scale_ms\tconfig\tbytes\twrite_ms\tlossless_diff\talpha_kept\n");
-	std::vector<StepSizes> step_sizes(static_cast<std::size_t>(paths.size()));
+	std::vector<std::vector<std::size_t>> step_sizes(static_cast<std::size_t>(paths.size()));
 
 	for (qsizetype n = 0; n < paths.size(); ++n) {
 		const int sample = static_cast<int>(n) + 1;
@@ -165,50 +159,44 @@ int main(int argc, char **argv)
 		}
 		const QImage &source = loaded.image;
 
-		for (const int display : HEIGHTS) {
-			for (const int scale : SCALES) {
-				QImage scaled;
-				const double scale_ms =
-					median_ms([&] { scaled = scale_portrait(source, display * scale / 100); });
-				for (const Config &config : CONFIGS) {
-					std::optional<core::EncodedImage> encoded;
-					const double write_ms = median_ms([&] {
-						encoded = write_portrait(scaled, config.format, config.quality);
-					});
-					if (!encoded) {
-						std::printf("%d\t%s\twrite failed\n", sample, config.name);
-						continue;
-					}
-					const QImage back = decode(*encoded);
-					// 可逆のはずの形式だけ、元の画素との違いを数える。-2 は数えていないことを示す
-					const long long diff = config.quality == 100 ||
-									       config.format == core::ImageFormat::Png
-								       ? differing_pixels(scaled, back)
-								       : -2;
-					std::printf(
-						"%d\t%lld\t%d\t%d\t%s\t%.1f\t%d\t%.1f\t%d\t%d\t%.1f\t%s\t%zu\t%.1f\t%lld\t%s\n",
-						sample, static_cast<long long>(info.size()), source.width(),
-						source.height(), source.hasAlphaChannel() ? "yes" : "no", load_ms,
-						display, scale / 100.0, scaled.width(), scaled.height(), scale_ms,
-						config.name, encoded->bytes.size(), write_ms, diff,
-						back.hasAlphaChannel() == scaled.hasAlphaChannel() ? "yes" : "no");
+		for (const int scale : SCALES) {
+			QImage scaled;
+			const double scale_ms = median_ms(
+				[&] { scaled = scale_portrait(source, core::EMBED_HEIGHT_LIMIT * scale / 100); });
+			for (const Config &config : CONFIGS) {
+				std::optional<core::EncodedImage> encoded;
+				const double write_ms = median_ms(
+					[&] { encoded = write_portrait(scaled, config.format, config.quality); });
+				if (!encoded) {
+					std::printf("%d\t%s\twrite failed\n", sample, config.name);
+					continue;
 				}
+				const QImage back = decode(*encoded);
+				// 可逆のはずの形式だけ、元の画素との違いを数える。-2 は数えていないことを示す
+				const long long diff = config.quality == 100 || config.format == core::ImageFormat::Png
+							       ? differing_pixels(scaled, back)
+							       : -2;
+				std::printf(
+					"%d\t%lld\t%d\t%d\t%s\t%.1f\t%d\t%.2f\t%d\t%d\t%.1f\t%s\t%zu\t%.1f\t%lld\t%s\n",
+					sample, static_cast<long long>(info.size()), source.width(), source.height(),
+					source.hasAlphaChannel() ? "yes" : "no", load_ms, core::EMBED_HEIGHT_LIMIT,
+					scale / 100.0, scaled.width(), scaled.height(), scale_ms, config.name,
+					encoded->bytes.size(), write_ms, diff,
+					back.hasAlphaChannel() == scaled.hasAlphaChannel() ? "yes" : "no");
 			}
 		}
 
-		for (const int display : HEIGHTS) {
-			for (std::size_t s = 0; s < steps.size(); ++s) {
-				const auto encoded = encode_portrait(source, display * steps[s].scale_percent / 100,
-								     format, steps[s].quality);
-				step_sizes[static_cast<std::size_t>(n)][{display, s}] = encoded ? encoded->bytes.size()
-												: 0;
-			}
+		for (const core::EmbedStep &step : steps) {
+			const auto encoded = encode_portrait(
+				source, core::EMBED_HEIGHT_LIMIT * step.scale_percent / 100, format, step.quality);
+			step_sizes[static_cast<std::size_t>(n)].push_back(encoded ? encoded->bytes.size() : 0);
 		}
 
 		if (!output.isEmpty()) {
 			// 比べられるよう、可逆の画質 100 も並べて書く
 			for (const int quality : {core::WEBP_DEFAULT_QUALITY, 100}) {
-				const auto encoded = encode_portrait(source, 300, core::ImageFormat::Webp, quality);
+				const auto encoded = encode_portrait(source, core::EMBED_HEIGHT_LIMIT,
+								     core::ImageFormat::Webp, quality);
 				QFile file(QDir(output).filePath(
 					QStringLiteral("sample-%1-q%2.webp").arg(sample).arg(quality)));
 				if (encoded && file.open(QIODevice::WriteOnly))
@@ -220,34 +208,16 @@ int main(int argc, char **argv)
 
 	std::printf("\n[plan]\nsteps");
 	for (const auto &step : steps)
-		std::printf("\t%.1fx/q%d", step.scale_percent / 100.0, step.quality);
+		std::printf("\t%.2fx/q%d", step.scale_percent / 100.0, step.quality);
 	std::printf("\n");
-	std::vector<const StepSizes *> present;
-	std::vector<std::size_t> numbers;
 	for (std::size_t n = 0; n < step_sizes.size(); ++n) {
 		if (step_sizes[n].empty())
 			continue;
-		present.push_back(&step_sizes[n]);
-		numbers.push_back(n + 1);
-	}
-	for (const int display : HEIGHTS) {
-		for (std::size_t i = 0; i < present.size(); ++i) {
-			const core::EmbedPlan plan = simulate({present[i]}, display, steps, format);
-			std::printf("single\tdisplay %d\tsample %zu\tproblem %d", display, numbers[i],
-				    static_cast<int>(plan.problem));
-			if (plan.problem == core::EmbedProblem::None)
-				std::printf("\tstep %zu\tbytes %zu", plan.images[0].step_index,
-					    plan.images[0].image.bytes.size());
-			std::printf("\n");
-		}
-		const core::EmbedPlan plan = simulate(present, display, steps, format);
-		std::printf("all\tdisplay %d\tproblem %d", display, static_cast<int>(plan.problem));
-		std::size_t total = 0;
-		for (std::size_t i = 0; i < plan.images.size(); ++i) {
-			std::printf("\tsample %zu: step %zu", numbers[i], plan.images[i].step_index);
-			total += plan.images[i].image.bytes.size();
-		}
-		std::printf("\ttotal %zu\n", total);
+		const core::EmbedChoice choice = simulate(step_sizes[n], steps, format);
+		std::printf("sample %zu\tproblem %d", n + 1, static_cast<int>(choice.problem));
+		if (choice.problem == core::EmbedProblem::None)
+			std::printf("\tstep %zu\tbytes %zu", choice.step_index, choice.image.bytes.size());
+		std::printf("\n");
 	}
 	return 0;
 }

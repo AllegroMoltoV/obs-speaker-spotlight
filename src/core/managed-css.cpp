@@ -92,4 +92,28 @@ std::optional<std::string> replace_block(std::string_view css, std::string_view 
 	return std::nullopt;
 }
 
+std::optional<std::string> remove_block(std::string_view css)
+{
+	switch (inspect_block(css)) {
+	case BlockState::Absent:
+		return std::string(css);
+	case BlockState::Intact: {
+		std::string before(css.substr(0, css.find(BLOCK_BEGIN)));
+		std::string_view after = css.substr(css.find(BLOCK_END) + BLOCK_END.size());
+		// replace_block() が範囲の前後に足した改行も取り除く
+		if (after.substr(0, 2) == "\r\n")
+			after.remove_prefix(2);
+		else if (after.substr(0, 1) == "\n")
+			after.remove_prefix(1);
+		if (after.empty())
+			while (!before.empty() && (before.back() == '\n' || before.back() == '\r'))
+				before.pop_back();
+		return before + std::string(after);
+	}
+	case BlockState::Broken:
+		break;
+	}
+	return std::nullopt;
+}
+
 } // namespace sspot::core
