@@ -482,7 +482,6 @@ void SpeakerSpotlightDock::on_copy_css()
 	set_status(text("CopyCss.Done"));
 }
 
-
 void SpeakerSpotlightDock::on_undo()
 {
 	obs_source_t *source = selected_source();
