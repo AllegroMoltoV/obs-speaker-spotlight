@@ -4,6 +4,8 @@ OBS Studio のブラウザーソースに表示した Discord StreamKit Overlay 
 
 A plugin for OBS Studio that highlights the person speaking in the Discord StreamKit Overlay voice widget shown in a browser source, dims the others, and replaces the Discord avatar with your own character portrait, all from a dock and without writing CSS.
 
+[配信プラグイン倉庫くん](https://soko-kun.allegromoltov.jp/plugins/allegromoltov/obs-speaker-spotlight) にも掲載しています。 / Also listed on [Plugin Soko-kun](https://soko-kun.allegromoltov.jp/plugins/allegromoltov/obs-speaker-spotlight?lang=en).
+
 ![OBS Studio のドックで発話スポットライトの設定を変え、話している人の立ち絵が明るくなる様子](docs/images/obs-speaker-spotlight.gif)
 
 本プラグインは Discord とは提携しておらず、Discord の承認を受けたものではありません。
