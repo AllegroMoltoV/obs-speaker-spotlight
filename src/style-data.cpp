@@ -36,12 +36,7 @@ core::StyleValues style_from_data(obs_data_t *data, const std::vector<core::Sect
 			case core::ItemKind::Toggle:
 				values.numbers[key] = static_cast<int>(obs_data_get_int(data, key.c_str()));
 				break;
-			case core::ItemKind::Color:
-				if (const auto color = core::parse_hex_color(obs_data_get_string(data, key.c_str())))
-					values.colors[key] = *color;
-				break;
 			case core::ItemKind::Choice:
-			case core::ItemKind::Font:
 				values.texts[key] = obs_data_get_string(data, key.c_str());
 				break;
 			}
@@ -55,8 +50,6 @@ obs_data_t *style_to_data(const core::StyleValues &values)
 	obs_data_t *data = obs_data_create();
 	for (const auto &[key, value] : values.numbers)
 		obs_data_set_int(data, key.c_str(), value);
-	for (const auto &[key, value] : values.colors)
-		obs_data_set_string(data, key.c_str(), core::to_hex_color(value).c_str());
 	for (const auto &[key, value] : values.texts)
 		obs_data_set_string(data, key.c_str(), value.c_str());
 	return data;

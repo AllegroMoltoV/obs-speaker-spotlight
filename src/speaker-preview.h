@@ -53,7 +53,6 @@ private:
 	struct Metrics {
 		QSize avatar; // 枠を含むアバターの外形 (CSS の px)
 		int border;   // 枠の幅
-		QSize name;   // 名前の箱。名前を隠すときは空
 		QSize panel;  // 1 つの状態の外形
 		int caption;  // 見出しの高さ (画面の px)
 		int total_width;
@@ -64,7 +63,6 @@ private:
 	static double scale_for(const Metrics &l, int width);
 	// 描く大きさに縮小し、明るさを掛けた立ち絵。大きさと明るさが同じ間は作り直さない
 	const QImage &portrait_image(const QSize &size, int percent, bool speaking);
-	QFont name_font() const;
 
 	core::VoiceLook look_;
 	QImage portrait_; // 復号した立ち絵。無いとき、使えないときは null

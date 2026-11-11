@@ -53,11 +53,6 @@ VoiceLook resolve_look(const StyleValues &values)
 	look.speaking_brightness = reader.number("speaking_brightness").value_or(100);
 	look.transition_ms = reader.number("transition_ms").value_or(0);
 	look.speaking_border_visible = reader.toggle("speaking_border_visible");
-	look.name_visible = reader.toggle("name_visible");
-	look.name_font = reader.text("name_font");
-	look.name_size = reader.number("name_size");
-	look.name_color = reader.color("name_color");
-	look.name_background = reader.color("name_background");
 	return look;
 }
 
@@ -95,7 +90,6 @@ std::string generate_css(const StyleValues &values, std::string_view user_id,
 	const std::string avatar = css::under(item, sk::AVATAR);
 	const std::string speaking_avatar = css::under(item + std::string(sk::SPEAKING), sk::AVATAR);
 	const std::string user = css::under(item, sk::USER);
-	const std::string name = css::under(user, sk::NAME);
 
 	const int height = look.avatar_height;
 
@@ -125,23 +119,8 @@ std::string generate_css(const StyleValues &values, std::string_view user_id,
 	if (!look.speaking_border_visible)
 		css.add(speaking_avatar, "border-color", "transparent");
 
-	css.add(user, "padding-top", "0");
-	if (!look.name_visible) {
-		css.add(user, "display", "none");
-	} else {
-		// StreamKit のコンテナの line-height: 19px が残るため、インラインの span では大きな文字の背景が
-		// 行の外へはみ出し、立ち絵に重なる。span 自身の高さで行を取らせる
-		css.add(name, "display", "inline-block");
-		css.add(name, "line-height", "normal");
-		if (!look.name_font.empty())
-			css.add(name, "font-family", css_string(look.name_font));
-		if (look.name_size)
-			css.add(name, "font-size", css::px(*look.name_size));
-		if (look.name_color)
-			css.add(name, "color", css::rgb_text(*look.name_color));
-		if (look.name_background)
-			css.add(name, "background-color", css::rgb_text(*look.name_background));
-	}
+	// 名前の文字列の幅はプラグインから分からず、ソースの大きさを決められないため、名前は出さない
+	css.add(user, "display", "none");
 
 	if (portrait && portrait_usable(*portrait)) {
 		const std::string image = css::under(target, sk::AVATAR);

@@ -21,7 +21,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <obs-module.h>
 
 #include <QByteArray>
-#include <QFontMetrics>
 #include <QPainter>
 
 #include <algorithm>
@@ -32,15 +31,8 @@ namespace sspot {
 
 namespace {
 
-// StreamKit のスタイルシートと、名前の span のインラインのスタイルの値
+// StreamKit のスタイルシートの値
 constexpr int AVATAR_BORDER = 3;
-constexpr int AVATAR_GAP = 8; // 生成する CSS の li の gap
-constexpr int NAME_PADDING_X = 6;
-constexpr int NAME_PADDING_Y = 4;
-constexpr int NAME_RADIUS = 3;
-constexpr int NAME_DEFAULT_SIZE = 14;
-const QColor NAME_DEFAULT_COLOR(255, 255, 255);
-const QColor NAME_DEFAULT_BACKGROUND(30, 33, 36, 242);
 constexpr core::Rgb SPEAKING_GREEN{0x3b, 0xa5, 0x3b};
 // アバターの画像は通話に入るまで分からないため、Discord の既定のアバターの色の円で代える
 constexpr core::Rgb AVATAR_PLACEHOLDER{0x58, 0x65, 0xf2};
@@ -92,16 +84,6 @@ void SpeakerPreview::set_portrait(const std::optional<core::PortraitImage> &port
 	update();
 }
 
-QFont SpeakerPreview::name_font() const
-{
-	QFont result = font();
-	if (!look_.name_font.empty())
-		result.setFamily(QString::fromStdString(look_.name_font));
-	result.setPixelSize(look_.name_size.value_or(NAME_DEFAULT_SIZE));
-	result.setWeight(QFont::DemiBold);
-	return result;
-}
-
 SpeakerPreview::Metrics SpeakerPreview::measure() const
 {
 	Metrics l{};
@@ -116,13 +98,7 @@ SpeakerPreview::Metrics SpeakerPreview::measure() const
 		l.avatar = QSize(height + 2 * AVATAR_BORDER, height + 2 * AVATAR_BORDER);
 		l.border = AVATAR_BORDER;
 	}
-	if (look_.name_visible) {
-		const QFontMetrics metrics(name_font());
-		l.name = QSize(metrics.horizontalAdvance(text("Preview.SampleName")) + 2 * NAME_PADDING_X,
-			       metrics.height() + 2 * NAME_PADDING_Y);
-	}
-	const int panel_width = l.avatar.width() + (l.name.isEmpty() ? 0 : AVATAR_GAP + l.name.width());
-	l.panel = QSize(panel_width, std::max(l.avatar.height(), l.name.height()));
+	l.panel = l.avatar;
 	l.caption = fontMetrics().height() + CAPTION_GAP;
 	l.total_width = 2 * l.panel.width() + PANEL_GAP;
 	return l;
@@ -188,8 +164,6 @@ void SpeakerPreview::paintEvent(QPaintEvent *)
 					 ((x / CHECKER + (y - body_top) / CHECKER) % 2) ? dark : light);
 
 	const QFont caption_font = font();
-	const QFont name = name_font();
-	const QString sample = text("Preview.SampleName");
 
 	for (int i = 0; i < 2; ++i) {
 		const bool speaking = i == 1;
@@ -228,23 +202,6 @@ void SpeakerPreview::paintEvent(QPaintEvent *)
 			}
 		}
 
-		if (!l.name.isEmpty()) {
-			const QRectF box(l.avatar.width() + AVATAR_GAP, (l.panel.height() - l.name.height()) / 2.0,
-					 l.name.width(), l.name.height());
-			const QColor background = look_.name_background
-							  ? QColor(look_.name_background->r, look_.name_background->g,
-								   look_.name_background->b)
-							  : NAME_DEFAULT_BACKGROUND;
-			const QColor color =
-				look_.name_color ? QColor(look_.name_color->r, look_.name_color->g, look_.name_color->b)
-						 : NAME_DEFAULT_COLOR;
-			painter.setPen(Qt::NoPen);
-			painter.setBrush(background);
-			painter.drawRoundedRect(box, NAME_RADIUS, NAME_RADIUS);
-			painter.setFont(name);
-			painter.setPen(color);
-			painter.drawText(box, Qt::AlignCenter, sample);
-		}
 		painter.restore();
 	}
 }

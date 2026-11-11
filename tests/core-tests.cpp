@@ -18,7 +18,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 // OBS に依存しない処理の単体テスト。失敗した検査を標準エラーに書き、終了コード 1 で終わる
 
-#include "core/css-builder.h"
 #include "core/managed-css.h"
 #include "core/pending-apply.h"
 #include "core/portrait-embed.h"
@@ -168,17 +167,6 @@ void test_streamkit_voice_url()
 	CHECK(!is_streamkit_voice_url(""));
 }
 
-void test_hex_color()
-{
-	CHECK((parse_hex_color("#1a2B3c") == Rgb{0x1a, 0x2b, 0x3c}));
-	CHECK((to_hex_color(Rgb{0x1a, 0x2b, 0x3c}) == "#1a2b3c"));
-	CHECK(!parse_hex_color("1a2b3c").has_value());
-	CHECK(!parse_hex_color("#1a2b3").has_value());
-	CHECK(!parse_hex_color("#1a2b3g").has_value());
-	CHECK(!parse_hex_color("red").has_value());
-	CHECK(!parse_hex_color("#000000; } @import url(x) {").has_value());
-}
-
 void test_sanitize()
 {
 	// 項目の表の型と範囲で値を捨てることを、テストの中の表で確かめる
@@ -189,35 +177,19 @@ void test_sanitize()
 		 {
 			 ItemDef{"size", ItemKind::Number, "Item.Size", 8, 96, std::nullopt, "px", {}, {}},
 			 shape,
-			 ItemDef{"font", ItemKind::Font, "Item.Font", 0, 0, std::nullopt, {}, {}, {}},
 		 }},
 	};
 	StyleValues values;
 	values.numbers["size"] = 1;
 	values.numbers["unknown_key"] = 5;
 	values.texts["shape"] = "triangle";
-	values.texts["font"] = "  Yu Gothic; } ";
-	values.colors["size"] = Rgb{1, 2, 3};
+	values.texts["size"] = "circle";
 	const StyleValues clean = sanitize(sections, values);
 	CHECK(clean.numbers.at("size") == 8);
 	CHECK(clean.numbers.count("unknown_key") == 0);
-	CHECK(clean.texts.count("shape") == 0);
-	CHECK(clean.texts.at("font") == "Yu Gothic");
-	CHECK(clean.colors.empty());
-}
-
-void test_sanitize_font_name()
-{
-	CHECK(sanitize_font_name("Yu Gothic UI") == "Yu Gothic UI");
-	CHECK(sanitize_font_name("  游ゴシック  ") == "游ゴシック");
-	CHECK(sanitize_font_name("a\"; } @import url(x) {") == "a  import urlx");
-	CHECK(sanitize_font_name("();{}").empty());
-}
-
-void test_css_string()
-{
-	CHECK(css_string("Yu Gothic") == "\"Yu Gothic\"");
-	CHECK(css_string("a\"b\\c\nd") == "\"a\\\"b\\\\cd\"");
+	CHECK(clean.texts.empty());
+	values.texts["shape"] = "square";
+	CHECK(sanitize(sections, values).texts.at("shape") == "square");
 }
 
 const std::string PNG_BYTES = std::string("\x89PNG\r\n\x1a\n", 8) + "rest-of-png";
@@ -404,9 +376,6 @@ StyleValues max_values()
 		for (const auto &item : section.items)
 			if (item.kind == ItemKind::Number || item.kind == ItemKind::Toggle)
 				values.numbers[std::string(item.key)] = item.max;
-	values.texts["name_font"] = "x\"); } @import url(http://example.com/x.css); a {";
-	values.colors["name_color"] = Rgb{1, 2, 3};
-	values.colors["name_background"] = Rgb{4, 5, 6};
 	return values;
 }
 
@@ -571,9 +540,6 @@ void test_resolve_look()
 	CHECK(defaults.speaking_brightness == 100);
 	CHECK(defaults.transition_ms == 200);
 	CHECK(defaults.speaking_border_visible);
-	CHECK(defaults.name_visible);
-	CHECK(defaults.name_font.empty());
-	CHECK(!defaults.name_size && !defaults.name_color && !defaults.name_background);
 
 	StyleValues values = max_values();
 	values.numbers["avatar_height"] = 9999;
@@ -582,9 +548,6 @@ void test_resolve_look()
 	CHECK(look.avatar_height == 600);
 	CHECK(look.idle_brightness == 200);
 	CHECK(!look.speaking_border_visible);
-	CHECK(look.name_size == std::optional<int>(72));
-	CHECK(look.name_color == std::optional<Rgb>(Rgb{1, 2, 3}));
-	CHECK(look.name_font.find_first_of("\"();{}@") == std::string::npos);
 }
 
 // CSS の brightness() と同じく、成分に倍率を掛けて 255 で頭打ちにする。1 を超える倍率も扱う
@@ -616,18 +579,16 @@ void test_portrait_usable()
 	CHECK(!portrait_usable(PortraitImage{ImageFormat::Png, "", 1, 1}));
 }
 
-// 名前の背景が立ち絵や隣の参加者に重ならないよう、表示するときは span に行の高さを取らせる
-void test_name_takes_its_own_line_height()
+// 名前の幅はプラグインから分からず、ソースの大きさを決められないため、設定にかかわらず名前を隠す
+void test_name_always_hidden()
 {
 	for (const StyleValues &values : {StyleValues{}, max_values()}) {
-		const std::string css = generate_css(values, USER_ID);
-		CHECK(css.find("  display: inline-block !important;\n") != std::string::npos);
-		CHECK(css.find("  line-height: normal !important;\n") != std::string::npos);
+		for (const auto &portrait : {std::optional<PortraitImage>(), std::optional(portrait_of(PNG_BYTES))}) {
+			const std::string css = generate_css(values, USER_ID, portrait);
+			CHECK(rule_of(css, ".voice_state .voice_username").find("display: none !important;") !=
+			      std::string::npos);
+		}
 	}
-	StyleValues hidden;
-	hidden.numbers["name_visible"] = 0;
-	const std::string css = generate_css(hidden, USER_ID);
-	CHECK(css.find("inline-block") == std::string::npos);
 }
 
 } // namespace
@@ -643,10 +604,7 @@ int main()
 	test_replace_ignores_other_plugin_markers();
 	test_remove_block();
 	test_streamkit_voice_url();
-	test_hex_color();
 	test_sanitize();
-	test_sanitize_font_name();
-	test_css_string();
 	test_user_id();
 	test_image_format();
 	test_source_limits();
@@ -662,7 +620,7 @@ int main()
 	test_resolve_look();
 	test_brighten();
 	test_portrait_usable();
-	test_name_takes_its_own_line_height();
+	test_name_always_hidden();
 
 	if (failures > 0) {
 		std::cerr << failures << " check(s) failed\n";

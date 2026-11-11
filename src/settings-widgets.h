@@ -23,14 +23,12 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QFormLayout>
-#include <QPushButton>
 #include <QSlider>
 #include <QSpinBox>
 #include <QToolButton>
 #include <QWidget>
 
 #include <functional>
-#include <optional>
 #include <string>
 #include <vector>
 
@@ -51,28 +49,6 @@ private:
 	QToolButton *header_{nullptr};
 	QWidget *body_{nullptr};
 	QFormLayout *form_{nullptr};
-};
-
-// 色を選ぶボタン。未指定のときは既定と表示する
-class ColorField : public QWidget {
-	Q_OBJECT
-
-public:
-	explicit ColorField(QWidget *parent = nullptr);
-
-	std::optional<core::Rgb> color() const { return color_; }
-	void set_color(const std::optional<core::Rgb> &color);
-
-signals:
-	void changed();
-
-private:
-	void choose();
-	void update_view();
-
-	QPushButton *button_{nullptr};
-	QToolButton *clear_button_{nullptr};
-	std::optional<core::Rgb> color_;
 };
 
 // 数値をスライダーで選ぶ欄。右に今の値を示す数値の欄を置き、直接の入力もできるようにする

@@ -30,26 +30,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <utility>
 #include <vector>
 
-namespace sspot::core {
-
-// CSS の二重引用符の文字列にする。書体の名前を font-family に入れるときに使う
-inline std::string css_string(std::string_view text)
-{
-	std::string out = "\"";
-	for (const char ch : text) {
-		const unsigned char c = static_cast<unsigned char>(ch);
-		if (c < 0x20 || c == 0x7f)
-			continue;
-		if (ch == '"' || ch == '\\')
-			out += '\\';
-		out += ch;
-	}
-	out += '"';
-	return out;
-}
-
-} // namespace sspot::core
-
 namespace sspot::core::css {
 
 // 設定の値を読む。範囲の外の値は表の範囲に収め、値が無い項目は表の既定値を返す
@@ -71,12 +51,6 @@ public:
 	}
 
 	bool toggle(std::string_view key) const { return number(key).value_or(0) != 0; }
-
-	std::optional<Rgb> color(std::string_view key) const
-	{
-		const auto it = values_.colors.find(key);
-		return it != values_.colors.end() ? std::optional<Rgb>(it->second) : std::nullopt;
-	}
 
 	std::string text(std::string_view key) const
 	{

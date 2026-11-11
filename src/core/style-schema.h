@@ -36,21 +36,15 @@ struct Rgb {
 	bool operator==(const Rgb &other) const { return r == other.r && g == other.g && b == other.b; }
 };
 
-// "#rrggbb" だけを受け付ける。生成する CSS に任意の文字列が入らないようにするため
-std::optional<Rgb> parse_hex_color(std::string_view text);
-std::string to_hex_color(const Rgb &color);
-
 enum class ItemKind {
 	Number,  // 整数。default_value が無ければ、最小値の 1 つ下を「既定」として扱う
 	Opacity, // 0 から 100 の百分率
 	Toggle,  // 0 か 1
-	Color,
-	Choice, // choices のいずれか
-	Font,   // 利用者の PC に入っている書体の名前
+	Choice,  // choices のいずれか
 };
 
-// 項目が効くための前提。値の書き方は、Toggle は "on"、Color は "set"、Choice は値そのもの、
-// Choice の否定は "!値"。いずれか 1 つが満たされれば効く
+// 項目が効くための前提。値の書き方は、Toggle は "on"、Choice は値そのもの、Choice の否定は "!値"。
+// いずれか 1 つが満たされれば効く
 struct Condition {
 	std::string_view key;
 	std::string_view value;
@@ -79,23 +73,16 @@ const ItemDef *find_item(const std::vector<SectionDef> &sections, std::string_vi
 
 // 設定の値。項目が無いときは既定の見た目のままにする
 struct StyleValues {
-	std::map<std::string, int, std::less<>> numbers; // Number・Opacity・Toggle
-	std::map<std::string, Rgb, std::less<>> colors;
-	std::map<std::string, std::string, std::less<>> texts; // Choice・Font
+	std::map<std::string, int, std::less<>> numbers;       // Number・Opacity・Toggle
+	std::map<std::string, std::string, std::less<>> texts; // Choice
 
-	bool operator==(const StyleValues &other) const
-	{
-		return numbers == other.numbers && colors == other.colors && texts == other.texts;
-	}
+	bool operator==(const StyleValues &other) const { return numbers == other.numbers && texts == other.texts; }
 };
 
 // 項目が今の値で効くときに true を返す。ドックで効かない欄を押せない状態にするために使う
 bool item_effective(const ItemDef &item, const std::vector<SectionDef> &sections, const StyleValues &values);
 
-// 書体の名前から、CSS の構文に関わる記号と制御文字を取り除く。前後の空白も取る
-std::string sanitize_font_name(std::string_view name);
-
-// 範囲の外の値と、表に無い項目と、選択肢に無い値を捨てる。書体の名前は sanitize_font_name() を通す
+// 範囲の外の値と、表に無い項目と、選択肢に無い値を捨てる
 StyleValues sanitize(const std::vector<SectionDef> &sections, const StyleValues &values);
 
 } // namespace sspot::core

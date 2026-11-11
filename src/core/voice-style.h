@@ -36,11 +36,6 @@ struct VoiceLook {
 	int speaking_brightness = 100;
 	int transition_ms = 0;
 	bool speaking_border_visible = true;
-	bool name_visible = true;
-	std::string name_font;         // 空なら StreamKit の書体のまま
-	std::optional<int> name_size;  // px。無ければ StreamKit の大きさのまま
-	std::optional<Rgb> name_color; // 無ければ StreamKit の色のまま
-	std::optional<Rgb> name_background;
 };
 
 VoiceLook resolve_look(const StyleValues &values);
@@ -55,7 +50,7 @@ std::uint8_t brighten(std::uint8_t channel, int percent);
 void brighten_pixels(std::uint32_t *pixels, std::size_t count, int percent);
 
 // 設定の値と 1 人のユーザー ID から、ブラウザーソースの管理範囲に書く CSS を作る。
-// user_id の参加者だけを表示して左上に置き、portrait があればアバターを置き換える。
+// user_id の参加者だけを表示して左上に置き、portrait があればアバターを置き換える。名前は常に隠す。
 // user_id は is_valid_user_id() を通った値だけを渡す。
 // 形式が分からない立ち絵、base64 に使わない文字を含む立ち絵は CSS に出さず、アバターのまま表示する
 std::string generate_css(const StyleValues &values, std::string_view user_id,

@@ -18,8 +18,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 // 生成した CSS を、ローカルのページに注入して表示を確かめるためにファイルへ書き出す。
 // 使い方: speaker-spotlight-css-dump <出力先のフォルダー> [ユーザー ID]
-// default.css (既定値)、max.css (数値を最大、緑の枠なし、名前の書体と色を指定)、
-// min.css (数値を最小、名前を隠す) にはテスト画像の立ち絵を入れ、avatar.css (既定値) には入れない。
+// default.css (既定値)、max.css (数値を最大、緑の枠なし)、min.css (数値を最小) にはテスト画像の立ち絵を入れ、
+// avatar.css (既定値) には入れない。
 // ユーザー ID を省くと 100000000000000001 にする
 
 #include "core/portrait.h"
@@ -59,14 +59,8 @@ StyleValues extreme_values(bool use_max)
 		for (const auto &item : section.items)
 			if (item.kind == ItemKind::Number)
 				values.numbers[std::string(item.key)] = use_max ? item.max : item.min;
-	if (use_max) {
+	if (use_max)
 		values.numbers["speaking_border_visible"] = 0;
-		values.texts["name_font"] = "Yu Gothic UI";
-		values.colors["name_color"] = Rgb{255, 230, 0};
-		values.colors["name_background"] = Rgb{20, 20, 60};
-	} else {
-		values.numbers["name_visible"] = 0;
-	}
 	return values;
 }
 

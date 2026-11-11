@@ -20,12 +20,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include <obs-module.h>
 
-#include <QColorDialog>
-#include <QFontDatabase>
 #include <QHBoxLayout>
-#include <QIcon>
 #include <QLabel>
-#include <QPixmap>
 #include <QVBoxLayout>
 
 namespace sspot {
@@ -35,11 +31,6 @@ namespace {
 QString locale_text(std::string_view key)
 {
 	return QString::fromUtf8(obs_module_text(std::string(key).c_str()));
-}
-
-QColor to_qcolor(const core::Rgb &c)
-{
-	return QColor(c.r, c.g, c.b);
 }
 
 } // namespace
@@ -74,57 +65,6 @@ void CollapsibleSection::set_expanded(bool expanded)
 	header_->blockSignals(false);
 	header_->setArrowType(expanded ? Qt::DownArrow : Qt::RightArrow);
 	body_->setVisible(expanded);
-}
-
-ColorField::ColorField(QWidget *parent) : QWidget(parent)
-{
-	button_ = new QPushButton(this);
-	clear_button_ = new QToolButton(this);
-	clear_button_->setText(locale_text("Field.Reset"));
-	clear_button_->setToolTip(locale_text("Field.ResetTooltip"));
-
-	auto *layout = new QHBoxLayout(this);
-	layout->setContentsMargins(0, 0, 0, 0);
-	layout->addWidget(button_, 1);
-	layout->addWidget(clear_button_);
-
-	connect(button_, &QPushButton::clicked, this, &ColorField::choose);
-	connect(clear_button_, &QToolButton::clicked, this, [this]() {
-		set_color(std::nullopt);
-		emit changed();
-	});
-	update_view();
-}
-
-void ColorField::set_color(const std::optional<core::Rgb> &color)
-{
-	color_ = color;
-	update_view();
-}
-
-void ColorField::choose()
-{
-	const QColor initial = color_ ? to_qcolor(*color_) : QColor(Qt::white);
-	const QColor chosen = QColorDialog::getColor(initial, this);
-	if (!chosen.isValid())
-		return;
-	set_color(core::Rgb{static_cast<std::uint8_t>(chosen.red()), static_cast<std::uint8_t>(chosen.green()),
-			    static_cast<std::uint8_t>(chosen.blue())});
-	emit changed();
-}
-
-void ColorField::update_view()
-{
-	if (color_) {
-		QPixmap swatch(16, 16);
-		swatch.fill(to_qcolor(*color_));
-		button_->setIcon(QIcon(swatch));
-		button_->setText(QString::fromStdString(core::to_hex_color(*color_)));
-	} else {
-		button_->setIcon(QIcon());
-		button_->setText(locale_text("Field.Default"));
-	}
-	clear_button_->setEnabled(color_.has_value());
 }
 
 SliderField::SliderField(int min, int max, const QString &suffix, const QString &special_text, const QString &name,
@@ -276,21 +216,6 @@ QWidget *SettingsPanel::create_field(const core::ItemDef &item)
 		widget = check;
 		break;
 	}
-	case core::ItemKind::Color: {
-		auto *color = new ColorField(this);
-		field.read = [color, key](core::StyleValues &values) {
-			if (const auto c = color->color())
-				values.colors[key] = *c;
-		};
-		field.write = [color, key](const core::StyleValues &values) {
-			const auto it = values.colors.find(key);
-			color->set_color(it != values.colors.end() ? std::optional<core::Rgb>(it->second)
-								   : std::nullopt);
-		};
-		connect(color, &ColorField::changed, this, &SettingsPanel::changed);
-		widget = color;
-		break;
-	}
 	case core::ItemKind::Choice: {
 		auto *combo = new QComboBox(this);
 		for (const auto &value : item.choices) {
@@ -306,39 +231,6 @@ QWidget *SettingsPanel::create_field(const core::ItemDef &item)
 			const int index = it != values.texts.end() ? combo->findData(QString::fromStdString(it->second))
 								   : 0;
 			combo->setCurrentIndex(index >= 0 ? index : 0);
-		};
-		field.blockers.push_back(combo);
-		connect(combo, &QComboBox::currentIndexChanged, this, &SettingsPanel::changed);
-		widget = combo;
-		break;
-	}
-	case core::ItemKind::Font: {
-		// 書体の候補は、利用者の PC に入っている書体だけにする
-		auto *combo = new QComboBox(this);
-		combo->addItem(locale_text("Field.Default"), QString());
-		for (const QString &family : QFontDatabase::families())
-			combo->addItem(family, family);
-		combo->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
-		combo->setMinimumContentsLength(8);
-		field.read = [combo, key](core::StyleValues &values) {
-			const QString family = combo->currentData().toString();
-			if (!family.isEmpty())
-				values.texts[key] = family.toStdString();
-		};
-		field.write = [combo, key](const core::StyleValues &values) {
-			const auto it = values.texts.find(key);
-			if (it == values.texts.end()) {
-				combo->setCurrentIndex(0);
-				return;
-			}
-			const QString family = QString::fromStdString(it->second);
-			int index = combo->findData(family);
-			// プリセットを作った PC にだけある書体も、名前を残して選べるようにする
-			if (index < 0) {
-				combo->addItem(family, family);
-				index = combo->count() - 1;
-			}
-			combo->setCurrentIndex(index);
 		};
 		field.blockers.push_back(combo);
 		connect(combo, &QComboBox::currentIndexChanged, this, &SettingsPanel::changed);
