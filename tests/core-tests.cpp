@@ -290,8 +290,9 @@ void test_embed_steps()
 	const std::vector<EmbedStep> png = embed_steps(false);
 	CHECK(png.size() == 3);
 	CHECK(png[0].scale_percent == 100 && png[1].scale_percent == 75 && png[2].scale_percent == 50);
-	// 最初の段は、表示の高さの上限 600px の 2 倍で書き出す
-	CHECK(EMBED_HEIGHT_LIMIT * webp[0].scale_percent / 100 == 1200);
+	// 最初の段は、表示の高さの上限と同じ 2160px で書き出す。表示の高さを上限まで上げても拡大して表示しない
+	CHECK(EMBED_HEIGHT_LIMIT * webp[0].scale_percent / 100 == 2160);
+	CHECK(find_item(voice_sections(), "avatar_height")->max == EMBED_HEIGHT_LIMIT);
 }
 
 void test_choose_embedding()
@@ -545,7 +546,7 @@ void test_resolve_look()
 	values.numbers["avatar_height"] = 9999;
 	values.numbers["speaking_border_visible"] = 0;
 	const VoiceLook look = resolve_look(values);
-	CHECK(look.avatar_height == 600);
+	CHECK(look.avatar_height == 2160);
 	CHECK(look.idle_brightness == 200);
 	CHECK(!look.speaking_border_visible);
 }

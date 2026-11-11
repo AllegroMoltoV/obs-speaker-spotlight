@@ -39,7 +39,7 @@ const std::vector<SectionDef> &voice_sections()
 		 }},
 		{"Section.Avatar",
 		 {
-			 {"avatar_height", ItemKind::Number, "Item.AvatarHeight", 20, 600, 150, "px", {}, {}},
+			 {"avatar_height", ItemKind::Number, "Item.AvatarHeight", 20, 2160, 150, "px", {}, {}},
 		 }},
 	};
 	return sections;

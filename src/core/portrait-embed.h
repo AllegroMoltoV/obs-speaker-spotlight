@@ -30,9 +30,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 namespace sspot::core {
 
-// 埋め込む画像の高さの上限 (px)。表示の高さの上限 600px の 2 倍。
+// 埋め込む画像の高さの上限 (px)。表示の高さの上限と同じ。
 // 表示の高さを変えても画像を作り直さずに済むよう、表示の高さではなくこの上限を基準に縮小する
-inline constexpr int EMBED_HEIGHT_LIMIT = 1200;
+inline constexpr int EMBED_HEIGHT_LIMIT = 2160;
 
 // EMBED_HEIGHT_LIMIT に掛ける倍率 (百分率) と、WebP の画質。画質 100 は可逆
 struct EmbedStep {

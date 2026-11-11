@@ -217,6 +217,13 @@ int main(int argc, char **argv)
 		std::printf("sample %zu\tproblem %d", n + 1, static_cast<int>(choice.problem));
 		if (choice.problem == core::EmbedProblem::None)
 			std::printf("\tstep %zu\tbytes %zu", choice.step_index, choice.image.bytes.size());
+		// プラグインが画像を選んだときと同じ関数で、読み込みから段の選択と書き出しまでの時間を計る
+		EmbedResult embedded;
+		const double embed_ms =
+			median_ms([&] { embedded = embed_portrait_file(paths[static_cast<qsizetype>(n)]); });
+		if (embedded.portrait)
+			std::printf("\tembed %dx%d\tbase64 %zu\tembed_ms %.1f", embedded.portrait->width,
+				    embedded.portrait->height, embedded.portrait->base64.size(), embed_ms);
 		std::printf("\n");
 	}
 	return 0;
