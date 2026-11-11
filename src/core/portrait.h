@@ -1,5 +1,5 @@
 /*
-Voice Spotlight
+Speaker Spotlight
 Copyright (C) 2026 AllegroMoltoV <contact@allegromoltov.jp>
 
 This program is free software; you can redistribute it and/or modify
@@ -25,7 +25,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <string_view>
 #include <vector>
 
-namespace vspot::core {
+namespace sspot::core {
 
 // 画像の大きさの上限 (元のファイルのバイト数)。仮決めのため、B1 の結果で変えるときはここだけを直す。
 // 1 枚の上限は base64 にして約 140 万文字で、Chromium の URL の上限 2,097,152 文字を下回る
@@ -110,4 +110,4 @@ struct Portrait {
 	std::string memo;   // ドックの中だけで使う覚え書きの名前。CSS には出さない
 };
 
-} // namespace vspot::core
+} // namespace sspot::core

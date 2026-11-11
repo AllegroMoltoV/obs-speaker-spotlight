@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 256 256" role="img" aria-labelledby="title description">
-  <title id="title">Voice Spotlight</title>
+  <title id="title">Speaker Spotlight</title>
   <desc id="description">Three tall portrait cards with bust silhouettes. The middle card is lit and raised; the side cards are dim.</desc>
   <rect x="12" y="12" width="232" height="232" rx="24" fill="#141414"/>
   <!-- Dim card left -->

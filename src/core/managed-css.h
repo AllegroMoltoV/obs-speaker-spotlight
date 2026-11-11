@@ -1,5 +1,5 @@
 /*
-Voice Spotlight
+Speaker Spotlight
 Copyright (C) 2026 AllegroMoltoV <contact@allegromoltov.jp>
 
 This program is free software; you can redistribute it and/or modify
@@ -22,11 +22,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <string>
 #include <string_view>
 
-namespace vspot::core {
+namespace sspot::core {
 
 // ブラウザーソースの css のうち、プラグインが書き換えてよい範囲の目印
-inline constexpr std::string_view BLOCK_BEGIN = "/* voice-spotlight begin */";
-inline constexpr std::string_view BLOCK_END = "/* voice-spotlight end */";
+inline constexpr std::string_view BLOCK_BEGIN = "/* speaker-spotlight begin */";
+inline constexpr std::string_view BLOCK_END = "/* speaker-spotlight end */";
 
 enum class BlockState {
 	Absent, // 目印が無い
@@ -49,4 +49,4 @@ enum class UndoDecision {
 // 元に戻す操作の扱いを決める。applied_css は最後に適用した直後の css
 UndoDecision decide_undo(bool has_previous, std::string_view current_css, std::string_view applied_css);
 
-} // namespace vspot::core
+} // namespace sspot::core

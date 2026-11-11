@@ -1,5 +1,5 @@
 /*
-Voice Spotlight
+Speaker Spotlight
 Copyright (C) 2026 AllegroMoltoV <contact@allegromoltov.jp>
 
 This program is free software; you can redistribute it and/or modify
@@ -20,11 +20,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include "style-data.h"
 
-namespace vspot {
+namespace sspot {
 
 namespace {
 
-constexpr const char *STATE_KEY = "voice_spotlight";
+constexpr const char *STATE_KEY = "speaker_spotlight";
 constexpr const char *HAS_PREVIOUS_KEY = "has_previous";
 constexpr const char *PREVIOUS_CSS_KEY = "previous_css";
 constexpr const char *APPLIED_CSS_KEY = "applied_css";
@@ -151,4 +151,4 @@ void set_source_css(obs_source_t *source, const std::string &css)
 	obs_data_release(update);
 }
 
-} // namespace vspot
+} // namespace sspot

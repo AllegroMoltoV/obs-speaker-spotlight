@@ -33,11 +33,11 @@
     },
     "platformConfig": {
         "macos": {
-            "bundleId": "jp.allegromoltov.obs-voice-spotlight"
+            "bundleId": "jp.allegromoltov.obs-speaker-spotlight"
         }
     },
-    "name": "voice-spotlight",
-    "displayName": "通話スポットライト / Voice Spotlight",
+    "name": "speaker-spotlight",
+    "displayName": "発話スポットライト / Speaker Spotlight",
     "version": "0.0.1",
     "author": "AllegroMoltoV",
     "website": "https://www.allegromoltov.jp",

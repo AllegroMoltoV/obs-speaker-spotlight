@@ -1,5 +1,5 @@
 /*
-Voice Spotlight
+Speaker Spotlight
 Copyright (C) 2026 AllegroMoltoV <contact@allegromoltov.jp>
 
 This program is free software; you can redistribute it and/or modify
@@ -24,7 +24,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <string>
 #include <vector>
 
-namespace vspot::core {
+namespace sspot::core {
 
 namespace {
 
@@ -119,4 +119,4 @@ bool is_streamkit_voice_url(std::string_view url)
 	       is_digits(segments[3]);
 }
 
-} // namespace vspot::core
+} // namespace sspot::core

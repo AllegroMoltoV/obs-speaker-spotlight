@@ -145,7 +145,7 @@ jobs:
       # build-macos は xcodebuild でプラグインのターゲットだけを作るため、テストのターゲットをここで作る
       - name: Run Unit Tests 🧪
         run: |
-          cmake --build build_macos --config ${{ needs.check-event.outputs.config }} --target voice-spotlight-core-tests
+          cmake --build build_macos --config ${{ needs.check-event.outputs.config }} --target speaker-spotlight-core-tests
           ctest --test-dir build_macos -C ${{ needs.check-event.outputs.config }} --output-on-failure
 
       - name: Package Plugin 📀

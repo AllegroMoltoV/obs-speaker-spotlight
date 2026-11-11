@@ -1,5 +1,5 @@
 /*
-Voice Spotlight
+Speaker Spotlight
 Copyright (C) 2026 AllegroMoltoV <contact@allegromoltov.jp>
 
 This program is free software; you can redistribute it and/or modify
@@ -30,7 +30,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <utility>
 #include <vector>
 
-namespace vspot::core {
+namespace sspot::core {
 
 // CSS の二重引用符の文字列にする。書体の名前を font-family に入れるときに使う
 inline std::string css_string(std::string_view text)
@@ -48,9 +48,9 @@ inline std::string css_string(std::string_view text)
 	return out;
 }
 
-} // namespace vspot::core
+} // namespace sspot::core
 
-namespace vspot::core::css {
+namespace sspot::core::css {
 
 // 設定の値を読む。範囲の外の値は表の範囲に収め、値が無い項目は表の既定値を返す
 class Reader {
@@ -213,4 +213,4 @@ private:
 	std::string raw_;
 };
 
-} // namespace vspot::core::css
+} // namespace sspot::core::css

@@ -1,5 +1,5 @@
 /*
-Voice Spotlight
+Speaker Spotlight
 Copyright (C) 2026 AllegroMoltoV <contact@allegromoltov.jp>
 
 This program is free software; you can redistribute it and/or modify
@@ -26,7 +26,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <string_view>
 #include <vector>
 
-namespace vspot::core {
+namespace sspot::core {
 
 struct Rgb {
 	std::uint8_t r = 0;
@@ -98,4 +98,4 @@ std::string sanitize_font_name(std::string_view name);
 // 範囲の外の値と、表に無い項目と、選択肢に無い値を捨てる。書体の名前は sanitize_font_name() を通す
 StyleValues sanitize(const std::vector<SectionDef> &sections, const StyleValues &values);
 
-} // namespace vspot::core
+} // namespace sspot::core

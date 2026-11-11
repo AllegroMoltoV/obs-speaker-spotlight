@@ -1,5 +1,5 @@
 /*
-Voice Spotlight
+Speaker Spotlight
 Copyright (C) 2026 AllegroMoltoV <contact@allegromoltov.jp>
 
 This program is free software; you can redistribute it and/or modify
@@ -20,7 +20,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <obs-frontend-api.h>
 #include <plugin-support.h>
 
-#include "voice-spotlight-dock.h"
+#include "speaker-spotlight-dock.h"
 
 #include <QByteArray>
 #include <QMainWindow>
@@ -30,9 +30,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE(PLUGIN_NAME, "en-US")
 
-static const char *DOCK_ID = "voice-spotlight-dock";
+static const char *DOCK_ID = "speaker-spotlight-dock";
 
-static vspot::VoiceSpotlightDock *g_dock = nullptr;
+static sspot::SpeakerSpotlightDock *g_dock = nullptr;
 
 static void register_dock()
 {
@@ -40,7 +40,7 @@ static void register_dock()
 	if (!main_window)
 		return;
 
-	g_dock = new vspot::VoiceSpotlightDock();
+	g_dock = new sspot::SpeakerSpotlightDock();
 	g_dock->setObjectName(DOCK_ID);
 
 	if (!obs_frontend_add_dock_by_id(DOCK_ID, obs_module_text("DockTitle"), g_dock)) {

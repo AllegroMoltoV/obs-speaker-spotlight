@@ -1,5 +1,5 @@
 /*
-Voice Spotlight
+Speaker Spotlight
 Copyright (C) 2026 AllegroMoltoV <contact@allegromoltov.jp>
 
 This program is free software; you can redistribute it and/or modify
@@ -28,7 +28,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QPixmap>
 #include <QVBoxLayout>
 
-namespace vspot {
+namespace sspot {
 
 namespace {
 
@@ -372,4 +372,4 @@ void SettingsPanel::set_values(const core::StyleValues &values)
 	update_enabled();
 }
 
-} // namespace vspot
+} // namespace sspot

@@ -1,5 +1,5 @@
 /*
-Voice Spotlight
+Speaker Spotlight
 Copyright (C) 2026 AllegroMoltoV <contact@allegromoltov.jp>
 
 This program is free software; you can redistribute it and/or modify
@@ -35,7 +35,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <string>
 #include <string_view>
 
-namespace vspot {
+namespace sspot {
 
 namespace {
 
@@ -287,4 +287,4 @@ void PortraitList::choose_image(PortraitRow *row)
 	emit changed();
 }
 
-} // namespace vspot
+} // namespace sspot

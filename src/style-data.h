@@ -1,5 +1,5 @@
 /*
-Voice Spotlight
+Speaker Spotlight
 Copyright (C) 2026 AllegroMoltoV <contact@allegromoltov.jp>
 
 This program is free software; you can redistribute it and/or modify
@@ -23,7 +23,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include <obs.h>
 
-namespace vspot {
+namespace sspot {
 
 // obs_data の値を設定の値にする。表に無いキーと範囲の外の値は捨てる
 core::StyleValues style_from_data(obs_data_t *data, const std::vector<core::SectionDef> &sections);
@@ -37,4 +37,4 @@ std::vector<core::PortraitEntry> portraits_from_array(obs_data_array_t *array);
 // 立ち絵の一覧を新しい obs_data の配列にする。呼び出し側が obs_data_array_release() で返す
 obs_data_array_t *portraits_to_array(const std::vector<core::PortraitEntry> &entries);
 
-} // namespace vspot
+} // namespace sspot

@@ -1,5 +1,5 @@
 /*
-Voice Spotlight
+Speaker Spotlight
 Copyright (C) 2026 AllegroMoltoV <contact@allegromoltov.jp>
 
 This program is free software; you can redistribute it and/or modify
@@ -24,7 +24,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <plugin-support.h>
 #include <util/platform.h>
 
-namespace vspot {
+namespace sspot {
 
 namespace {
 
@@ -109,4 +109,4 @@ bool save_presets(const std::vector<Preset> &presets)
 	return saved;
 }
 
-} // namespace vspot
+} // namespace sspot

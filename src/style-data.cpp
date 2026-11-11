@@ -1,5 +1,5 @@
 /*
-Voice Spotlight
+Speaker Spotlight
 Copyright (C) 2026 AllegroMoltoV <contact@allegromoltov.jp>
 
 This program is free software; you can redistribute it and/or modify
@@ -18,7 +18,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include "style-data.h"
 
-namespace vspot {
+namespace sspot {
 
 namespace {
 
@@ -97,4 +97,4 @@ obs_data_array_t *portraits_to_array(const std::vector<core::PortraitEntry> &ent
 	return array;
 }
 
-} // namespace vspot
+} // namespace sspot

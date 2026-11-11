@@ -1,5 +1,5 @@
 /*
-Voice Spotlight
+Speaker Spotlight
 Copyright (C) 2026 AllegroMoltoV <contact@allegromoltov.jp>
 
 This program is free software; you can redistribute it and/or modify
@@ -20,7 +20,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include <set>
 
-namespace vspot::core {
+namespace sspot::core {
 
 namespace {
 
@@ -170,4 +170,4 @@ EntryCheck check_entries(const std::vector<PortraitEntry> &entries)
 	return {};
 }
 
-} // namespace vspot::core
+} // namespace sspot::core

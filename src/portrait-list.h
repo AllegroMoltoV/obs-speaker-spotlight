@@ -1,5 +1,5 @@
 /*
-Voice Spotlight
+Speaker Spotlight
 Copyright (C) 2026 AllegroMoltoV <contact@allegromoltov.jp>
 
 This program is free software; you can redistribute it and/or modify
@@ -30,7 +30,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include <vector>
 
-namespace vspot {
+namespace sspot {
 
 // ImageProblem を利用者に示す文言
 QString image_problem_text(core::ImageProblem problem);
@@ -91,4 +91,4 @@ private:
 	std::vector<PortraitRow *> rows_;
 };
 
-} // namespace vspot
+} // namespace sspot

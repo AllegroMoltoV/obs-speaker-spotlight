@@ -1,5 +1,5 @@
 /*
-Voice Spotlight
+Speaker Spotlight
 Copyright (C) 2026 AllegroMoltoV <contact@allegromoltov.jp>
 
 This program is free software; you can redistribute it and/or modify
@@ -45,7 +45,7 @@ void check(bool condition, const char *what, int line)
 
 #define CHECK(expr) check((expr), #expr, __LINE__)
 
-using namespace vspot::core;
+using namespace sspot::core;
 
 const std::string DEFAULT_CSS = "body { background-color: rgba(0, 0, 0, 0); margin: 0px auto; overflow: hidden; }";
 
@@ -59,8 +59,8 @@ size_t count(const std::string &text, const std::string &needle)
 
 void test_markers_name_this_plugin()
 {
-	CHECK(BLOCK_BEGIN == "/* voice-spotlight begin */");
-	CHECK(BLOCK_END == "/* voice-spotlight end */");
+	CHECK(BLOCK_BEGIN == "/* speaker-spotlight begin */");
+	CHECK(BLOCK_END == "/* speaker-spotlight end */");
 }
 
 void test_replace_appends_when_absent()

@@ -1,5 +1,5 @@
 /*
-Voice Spotlight
+Speaker Spotlight
 Copyright (C) 2026 AllegroMoltoV <contact@allegromoltov.jp>
 
 This program is free software; you can redistribute it and/or modify
@@ -24,7 +24,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QLineEdit>
 #include <QString>
 
-namespace vspot {
+namespace sspot {
 
 // 貼り付けた StreamKit の音声ウィジェットの URL を表示するブラウザーソースを、現在のシーンに作るダイアログ
 class CreateSourceDialog : public QDialog {
@@ -49,4 +49,4 @@ private:
 	QString created_uuid_;
 };
 
-} // namespace vspot
+} // namespace sspot

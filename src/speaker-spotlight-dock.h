@@ -1,5 +1,5 @@
 /*
-Voice Spotlight
+Speaker Spotlight
 Copyright (C) 2026 AllegroMoltoV <contact@allegromoltov.jp>
 
 This program is free software; you can redistribute it and/or modify
@@ -30,7 +30,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <optional>
 #include <string>
 
-namespace vspot {
+namespace sspot {
 
 class CollapsibleSection;
 class PortraitList;
@@ -48,11 +48,11 @@ signals:
 	void popup_requested();
 };
 
-class VoiceSpotlightDock : public QWidget {
+class SpeakerSpotlightDock : public QWidget {
 	Q_OBJECT
 
 public:
-	explicit VoiceSpotlightDock(QWidget *parent = nullptr);
+	explicit SpeakerSpotlightDock(QWidget *parent = nullptr);
 
 	void refresh_sources();
 	void clear_sources();
@@ -109,4 +109,4 @@ private:
 	QPushButton *write_css_file_button_{nullptr};
 };
 
-} // namespace vspot
+} // namespace sspot

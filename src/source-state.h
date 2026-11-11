@@ -1,5 +1,5 @@
 /*
-Voice Spotlight
+Speaker Spotlight
 Copyright (C) 2026 AllegroMoltoV <contact@allegromoltov.jp>
 
 This program is free software; you can redistribute it and/or modify
@@ -26,9 +26,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <string>
 #include <vector>
 
-namespace vspot {
+namespace sspot {
 
-// ブラウザーソースごとの状態。private settings の "voice_spotlight" に置き、シーンコレクションと一緒に保存される
+// ブラウザーソースごとの状態。private settings の "speaker_spotlight" に置き、シーンコレクションと一緒に保存される
 struct SourceState {
 	bool has_previous = false;
 	std::string previous_css; // 最後の適用の前の css
@@ -39,11 +39,11 @@ SourceState load_source_state(obs_source_t *source);
 void save_apply_record(obs_source_t *source, const std::string &previous_css, const std::string &applied_css);
 void clear_apply_record(obs_source_t *source);
 
-// 見た目の設定。private settings の voice_spotlight の "style" に置く
+// 見た目の設定。private settings の speaker_spotlight の "style" に置く
 core::StyleValues load_style(obs_source_t *source);
 void save_style(obs_source_t *source, const core::StyleValues &values);
 
-// 立ち絵の一覧。private settings の voice_spotlight の "portraits" に置く。画像の中身は置かない
+// 立ち絵の一覧。private settings の speaker_spotlight の "portraits" に置く。画像の中身は置かない
 std::vector<core::PortraitEntry> load_portraits(obs_source_t *source);
 void save_portraits(obs_source_t *source, const std::vector<core::PortraitEntry> &entries);
 
@@ -52,4 +52,4 @@ std::string get_source_css(obs_source_t *source);
 // css を書き換える。ブラウザーソースはページを読み込み直す
 void set_source_css(obs_source_t *source, const std::string &css);
 
-} // namespace vspot
+} // namespace sspot

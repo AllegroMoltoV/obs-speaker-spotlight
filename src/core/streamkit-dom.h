@@ -1,5 +1,5 @@
 /*
-Voice Spotlight
+Speaker Spotlight
 Copyright (C) 2026 AllegroMoltoV <contact@allegromoltov.jp>
 
 This program is free software; you can redistribute it and/or modify
@@ -24,7 +24,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <string>
 #include <string_view>
 
-namespace vspot::core::streamkit {
+namespace sspot::core::streamkit {
 
 inline constexpr std::string_view BODY = "body";
 inline constexpr std::string_view LIST = ".voice_states";             // 参加者の一覧の ul
@@ -41,4 +41,4 @@ inline std::string item_of_user(std::string_view user_id)
 	return std::string(ITEM) + "[" + std::string(USER_ID_ATTRIBUTE) + "=\"" + std::string(user_id) + "\"]";
 }
 
-} // namespace vspot::core::streamkit
+} // namespace sspot::core::streamkit

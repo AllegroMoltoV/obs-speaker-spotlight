@@ -1,5 +1,5 @@
 /*
-Voice Spotlight
+Speaker Spotlight
 Copyright (C) 2026 AllegroMoltoV <contact@allegromoltov.jp>
 
 This program is free software; you can redistribute it and/or modify
@@ -17,7 +17,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 */
 
 // 生成した CSS を、ローカルのページに注入して表示を確かめるためにファイルへ書き出す。
-// 使い方: voice-spotlight-css-dump <出力先のフォルダー> [ユーザー ID 1] [ユーザー ID 2]
+// 使い方: speaker-spotlight-css-dump <出力先のフォルダー> [ユーザー ID 1] [ユーザー ID 2]
 // default.css (既定値)、max.css (数値を最大、横並び、緑の枠なし、名前の書体と色を指定)、
 // min.css (数値を最小、縦並び、名前を隠す) を書く。3 つとも、2 人分のテスト画像の立ち絵を入れる。
 // ユーザー ID を省くと 100000000000000001 と 100000000000000002 にする
@@ -31,7 +31,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <utility>
 #include <vector>
 
-using namespace vspot::core;
+using namespace sspot::core;
 
 namespace {
 
@@ -100,7 +100,7 @@ bool write_file(const std::string &path, const std::string &text)
 int main(int argc, char **argv)
 {
 	if (argc < 2) {
-		std::cerr << "usage: voice-spotlight-css-dump <output-dir> [user-id-1] [user-id-2]\n";
+		std::cerr << "usage: speaker-spotlight-css-dump <output-dir> [user-id-1] [user-id-2]\n";
 		return 2;
 	}
 	const std::string dir = argv[1];

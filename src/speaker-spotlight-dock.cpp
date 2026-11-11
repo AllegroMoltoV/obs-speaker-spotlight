@@ -1,5 +1,5 @@
 /*
-Voice Spotlight
+Speaker Spotlight
 Copyright (C) 2026 AllegroMoltoV <contact@allegromoltov.jp>
 
 This program is free software; you can redistribute it and/or modify
@@ -16,7 +16,7 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see <https://www.gnu.org/licenses/>
 */
 
-#include "voice-spotlight-dock.h"
+#include "speaker-spotlight-dock.h"
 
 #include "core/managed-css.h"
 #include "core/portrait.h"
@@ -52,7 +52,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <utility>
 #include <vector>
 
-namespace vspot {
+namespace sspot {
 
 namespace {
 
@@ -113,7 +113,7 @@ void SourceComboBox::showPopup()
 	QComboBox::showPopup();
 }
 
-VoiceSpotlightDock::VoiceSpotlightDock(QWidget *parent) : QWidget(parent)
+SpeakerSpotlightDock::SpeakerSpotlightDock(QWidget *parent) : QWidget(parent)
 {
 	auto *content = new QWidget();
 	auto *layout = new QVBoxLayout(content);
@@ -219,18 +219,18 @@ VoiceSpotlightDock::VoiceSpotlightDock(QWidget *parent) : QWidget(parent)
 		std::max(content->minimumSizeHint().width(), panel_->expanded_minimum_size().width() + margins);
 	setMinimumWidth(content_width + scroll->verticalScrollBar()->sizeHint().width());
 
-	connect(source_combo_, &SourceComboBox::popup_requested, this, &VoiceSpotlightDock::refresh_sources);
-	connect(source_combo_, &QComboBox::currentIndexChanged, this, &VoiceSpotlightDock::on_source_changed);
-	connect(create_source_button_, &QPushButton::clicked, this, &VoiceSpotlightDock::on_create_source);
-	connect(portraits_, &PortraitList::changed, this, &VoiceSpotlightDock::on_settings_changed);
-	connect(panel_, &SettingsPanel::changed, this, &VoiceSpotlightDock::on_settings_changed);
-	connect(apply_button_, &QPushButton::clicked, this, &VoiceSpotlightDock::on_apply);
-	connect(undo_button_, &QPushButton::clicked, this, &VoiceSpotlightDock::on_undo);
-	connect(copy_css_button_, &QPushButton::clicked, this, &VoiceSpotlightDock::on_copy_css);
-	connect(write_css_file_button_, &QPushButton::clicked, this, &VoiceSpotlightDock::on_write_css_file);
-	connect(preset_load_button_, &QPushButton::clicked, this, &VoiceSpotlightDock::on_preset_load);
-	connect(preset_save_button_, &QPushButton::clicked, this, &VoiceSpotlightDock::on_preset_save);
-	connect(preset_delete_button_, &QPushButton::clicked, this, &VoiceSpotlightDock::on_preset_delete);
+	connect(source_combo_, &SourceComboBox::popup_requested, this, &SpeakerSpotlightDock::refresh_sources);
+	connect(source_combo_, &QComboBox::currentIndexChanged, this, &SpeakerSpotlightDock::on_source_changed);
+	connect(create_source_button_, &QPushButton::clicked, this, &SpeakerSpotlightDock::on_create_source);
+	connect(portraits_, &PortraitList::changed, this, &SpeakerSpotlightDock::on_settings_changed);
+	connect(panel_, &SettingsPanel::changed, this, &SpeakerSpotlightDock::on_settings_changed);
+	connect(apply_button_, &QPushButton::clicked, this, &SpeakerSpotlightDock::on_apply);
+	connect(undo_button_, &QPushButton::clicked, this, &SpeakerSpotlightDock::on_undo);
+	connect(copy_css_button_, &QPushButton::clicked, this, &SpeakerSpotlightDock::on_copy_css);
+	connect(write_css_file_button_, &QPushButton::clicked, this, &SpeakerSpotlightDock::on_write_css_file);
+	connect(preset_load_button_, &QPushButton::clicked, this, &SpeakerSpotlightDock::on_preset_load);
+	connect(preset_save_button_, &QPushButton::clicked, this, &SpeakerSpotlightDock::on_preset_save);
+	connect(preset_delete_button_, &QPushButton::clicked, this, &SpeakerSpotlightDock::on_preset_delete);
 	connect(preset_combo_, &QComboBox::currentIndexChanged, this, [this](int index) {
 		preset_load_button_->setEnabled(index >= 0);
 		preset_delete_button_->setEnabled(index >= 0);
@@ -246,7 +246,7 @@ VoiceSpotlightDock::VoiceSpotlightDock(QWidget *parent) : QWidget(parent)
 	load_settings();
 }
 
-void VoiceSpotlightDock::refresh_sources()
+void SpeakerSpotlightDock::refresh_sources()
 {
 	const QString selected_uuid = source_combo_->currentData().toString();
 
@@ -266,7 +266,7 @@ void VoiceSpotlightDock::refresh_sources()
 	update_view();
 }
 
-void VoiceSpotlightDock::clear_sources()
+void SpeakerSpotlightDock::clear_sources()
 {
 	source_combo_->blockSignals(true);
 	source_combo_->clear();
@@ -275,7 +275,7 @@ void VoiceSpotlightDock::clear_sources()
 	update_view();
 }
 
-obs_source_t *VoiceSpotlightDock::selected_source() const
+obs_source_t *SpeakerSpotlightDock::selected_source() const
 {
 	const QString uuid = source_combo_->currentData().toString();
 	if (uuid.isEmpty())
@@ -283,7 +283,7 @@ obs_source_t *VoiceSpotlightDock::selected_source() const
 	return obs_get_source_by_uuid(uuid.toUtf8().constData());
 }
 
-void VoiceSpotlightDock::load_settings()
+void SpeakerSpotlightDock::load_settings()
 {
 	obs_source_t *source = selected_source();
 	if (source) {
@@ -297,7 +297,7 @@ void VoiceSpotlightDock::load_settings()
 	update_css_view();
 }
 
-void VoiceSpotlightDock::update_view()
+void SpeakerSpotlightDock::update_view()
 {
 	obs_source_t *source = selected_source();
 	const bool has_source = source != nullptr;
@@ -322,7 +322,7 @@ void VoiceSpotlightDock::update_view()
 	obs_source_release(source);
 }
 
-void VoiceSpotlightDock::update_css_view()
+void SpeakerSpotlightDock::update_css_view()
 {
 	// 画像のファイルを読み直すため、閉じている間は作らない
 	if (!css_toggle_button_->isChecked())
@@ -337,19 +337,19 @@ void VoiceSpotlightDock::update_css_view()
 	css_view_->setPlainText(QString::fromStdString(shown));
 }
 
-void VoiceSpotlightDock::set_status(const QString &message)
+void SpeakerSpotlightDock::set_status(const QString &message)
 {
 	status_label_->setText(message);
 }
 
-void VoiceSpotlightDock::on_source_changed()
+void SpeakerSpotlightDock::on_source_changed()
 {
 	set_status({});
 	load_settings();
 	update_view();
 }
 
-void VoiceSpotlightDock::on_settings_changed()
+void SpeakerSpotlightDock::on_settings_changed()
 {
 	// 設定は操作のたびにソースへ保存する。css を書き換えるとページが読み込み直されるため、適用はボタンでだけ行う
 	obs_source_t *source = selected_source();
@@ -361,7 +361,7 @@ void VoiceSpotlightDock::on_settings_changed()
 	update_css_view();
 }
 
-void VoiceSpotlightDock::on_create_source()
+void SpeakerSpotlightDock::on_create_source()
 {
 	CreateSourceDialog dialog(this);
 	if (dialog.exec() != QDialog::Accepted)
@@ -374,7 +374,7 @@ void VoiceSpotlightDock::on_create_source()
 	set_status(text("CreateSource.Created"));
 }
 
-VoiceSpotlightDock::BuiltCss VoiceSpotlightDock::build_css() const
+SpeakerSpotlightDock::BuiltCss SpeakerSpotlightDock::build_css() const
 {
 	const std::vector<core::PortraitEntry> entries = portraits_->entries();
 	const core::EntryCheck check = core::check_entries(entries);
@@ -424,7 +424,7 @@ VoiceSpotlightDock::BuiltCss VoiceSpotlightDock::build_css() const
 	return {core::generate_css(panel_->values(), portraits), {}};
 }
 
-void VoiceSpotlightDock::write_managed_css(const std::string &generated)
+void SpeakerSpotlightDock::write_managed_css(const std::string &generated)
 {
 	obs_source_t *source = selected_source();
 	if (!source) {
@@ -458,7 +458,7 @@ void VoiceSpotlightDock::write_managed_css(const std::string &generated)
 	update_view();
 }
 
-void VoiceSpotlightDock::on_apply()
+void SpeakerSpotlightDock::on_apply()
 {
 	obs_source_t *source = selected_source();
 	if (!source) {
@@ -478,7 +478,7 @@ void VoiceSpotlightDock::on_apply()
 	update_css_view();
 }
 
-void VoiceSpotlightDock::on_copy_css()
+void SpeakerSpotlightDock::on_copy_css()
 {
 	const BuiltCss built = build_css();
 	if (!built.css) {
@@ -489,7 +489,7 @@ void VoiceSpotlightDock::on_copy_css()
 	set_status(text("CopyCss.Done"));
 }
 
-void VoiceSpotlightDock::on_write_css_file()
+void SpeakerSpotlightDock::on_write_css_file()
 {
 	const QString path =
 		QFileDialog::getOpenFileName(this, text("WriteCssFile.Title"), QString(), text("WriteCssFile.Filter"));
@@ -504,7 +504,7 @@ void VoiceSpotlightDock::on_write_css_file()
 	write_managed_css(std::string(bytes.constData(), static_cast<size_t>(bytes.size())));
 }
 
-void VoiceSpotlightDock::on_undo()
+void SpeakerSpotlightDock::on_undo()
 {
 	obs_source_t *source = selected_source();
 	if (!source) {
@@ -543,7 +543,7 @@ void VoiceSpotlightDock::on_undo()
 	update_view();
 }
 
-void VoiceSpotlightDock::refresh_presets(const QString &select_name)
+void SpeakerSpotlightDock::refresh_presets(const QString &select_name)
 {
 	const QSignalBlocker blocker(preset_combo_);
 	preset_combo_->clear();
@@ -554,7 +554,7 @@ void VoiceSpotlightDock::refresh_presets(const QString &select_name)
 	preset_delete_button_->setEnabled(preset_combo_->currentIndex() >= 0);
 }
 
-void VoiceSpotlightDock::on_preset_save()
+void SpeakerSpotlightDock::on_preset_save()
 {
 	bool ok = false;
 	const QString name = QInputDialog::getText(this, text("Preset.SaveTitle"), text("Preset.SaveName"),
@@ -583,7 +583,7 @@ void VoiceSpotlightDock::on_preset_save()
 	set_status(text("Preset.Saved").arg(name));
 }
 
-void VoiceSpotlightDock::on_preset_load()
+void SpeakerSpotlightDock::on_preset_load()
 {
 	if (preset_combo_->currentIndex() < 0)
 		return;
@@ -602,7 +602,7 @@ void VoiceSpotlightDock::on_preset_load()
 	refresh_presets();
 }
 
-void VoiceSpotlightDock::on_preset_delete()
+void SpeakerSpotlightDock::on_preset_delete()
 {
 	if (preset_combo_->currentIndex() < 0)
 		return;
@@ -621,4 +621,4 @@ void VoiceSpotlightDock::on_preset_delete()
 	set_status(text("Preset.Deleted").arg(name));
 }
 
-} // namespace vspot
+} // namespace sspot

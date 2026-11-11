@@ -1,5 +1,5 @@
 /*
-Voice Spotlight
+Speaker Spotlight
 Copyright (C) 2026 AllegroMoltoV <contact@allegromoltov.jp>
 
 This program is free software; you can redistribute it and/or modify
@@ -20,7 +20,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include <algorithm>
 
-namespace vspot::core {
+namespace sspot::core {
 
 namespace {
 
@@ -226,4 +226,4 @@ StyleValues sanitize(const std::vector<SectionDef> &sections, const StyleValues 
 	return result;
 }
 
-} // namespace vspot::core
+} // namespace sspot::core

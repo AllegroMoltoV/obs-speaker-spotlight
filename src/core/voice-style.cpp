@@ -1,5 +1,5 @@
 /*
-Voice Spotlight
+Speaker Spotlight
 Copyright (C) 2026 AllegroMoltoV <contact@allegromoltov.jp>
 
 This program is free software; you can redistribute it and/or modify
@@ -24,7 +24,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <algorithm>
 #include <set>
 
-namespace vspot::core {
+namespace sspot::core {
 
 namespace {
 
@@ -191,4 +191,4 @@ std::string abbreviate_data_uris(std::string_view css, std::string_view count_fo
 	return out;
 }
 
-} // namespace vspot::core
+} // namespace sspot::core

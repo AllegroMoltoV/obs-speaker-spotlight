@@ -1,5 +1,5 @@
 /*
-Voice Spotlight
+Speaker Spotlight
 Copyright (C) 2026 AllegroMoltoV <contact@allegromoltov.jp>
 
 This program is free software; you can redistribute it and/or modify
@@ -20,7 +20,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include <string_view>
 
-namespace vspot::core {
+namespace sspot::core {
 
 // StreamKit の音声ウィジェットの URL の形に当てはまるときに true を返す。
 // 形は https://streamkit.discord.com/overlay/voice/<サーバー ID>/<チャンネル ID> で、
@@ -28,4 +28,4 @@ namespace vspot::core {
 // 当てはまらなくても適用は止めず、ドックの警告にだけ使う
 bool is_streamkit_voice_url(std::string_view url);
 
-} // namespace vspot::core
+} // namespace sspot::core

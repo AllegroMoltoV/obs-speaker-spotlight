@@ -1,5 +1,5 @@
 /*
-Voice Spotlight
+Speaker Spotlight
 Copyright (C) 2026 AllegroMoltoV <contact@allegromoltov.jp>
 
 This program is free software; you can redistribute it and/or modify
@@ -34,7 +34,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <string>
 #include <vector>
 
-namespace vspot {
+namespace sspot {
 
 // 見出しを押すと中身を開閉する区画
 class CollapsibleSection : public QWidget {
@@ -130,4 +130,4 @@ private:
 	std::vector<Field> fields_;
 };
 
-} // namespace vspot
+} // namespace sspot
