@@ -24,9 +24,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include <QComboBox>
 #include <QLabel>
-#include <QPlainTextEdit>
 #include <QPushButton>
-#include <QToolButton>
 #include <QWidget>
 
 #include <map>
@@ -66,8 +64,6 @@ private slots:
 	void on_settings_changed();
 	void on_create_source();
 	void on_apply();
-	void on_undo();
-	void on_copy_css();
 	void on_preset_save();
 	void on_preset_load();
 	void on_preset_delete();
@@ -86,10 +82,9 @@ private:
 	// 欄の設定と立ち絵の画像のファイルから CSS を作る。画像のファイルはその都度確かめ、縮小して書き出す。
 	// 作れたときは、各行に埋め込んだ画像の大きさを表示する
 	BuiltCss build_css();
-	// generated を選択中のソースの css の管理範囲に書き、元に戻す先を記録する
+	// generated を選択中のソースの css の管理範囲に書く
 	void write_managed_css(const std::string &generated);
 	void update_view();
-	void update_css_view();
 	void refresh_presets(const QString &select_name = {});
 	void set_status(const QString &message);
 
@@ -105,11 +100,7 @@ private:
 	QPushButton *preset_save_button_{nullptr};
 	QPushButton *preset_delete_button_{nullptr};
 	QPushButton *apply_button_{nullptr};
-	QPushButton *undo_button_{nullptr};
-	QPushButton *copy_css_button_{nullptr};
 	QLabel *status_label_{nullptr};
-	QToolButton *css_toggle_button_{nullptr};
-	QPlainTextEdit *css_view_{nullptr};
 
 	// 縮小して書き出した画像のキャッシュのキー。元のファイルが変われば更新日時か大きさが変わる
 	struct EmbedKey {

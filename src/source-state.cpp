@@ -25,9 +25,6 @@ namespace sspot {
 namespace {
 
 constexpr const char *STATE_KEY = "speaker_spotlight";
-constexpr const char *HAS_PREVIOUS_KEY = "has_previous";
-constexpr const char *PREVIOUS_CSS_KEY = "previous_css";
-constexpr const char *APPLIED_FINGERPRINT_KEY = "applied_css_fingerprint";
 constexpr const char *STYLE_KEY = "style";
 constexpr const char *PORTRAITS_KEY = "portraits";
 
@@ -53,39 +50,6 @@ std::string get_string_setting(obs_source_t *source, const char *key)
 }
 
 } // namespace
-
-SourceState load_source_state(obs_source_t *source)
-{
-	SourceState result;
-	obs_data_t *priv = obs_source_get_private_settings(source);
-	obs_data_t *state = obs_data_get_obj(priv, STATE_KEY);
-	if (state) {
-		result.has_previous = obs_data_get_bool(state, HAS_PREVIOUS_KEY);
-		result.previous_css = obs_data_get_string(state, PREVIOUS_CSS_KEY);
-		result.applied_fingerprint = obs_data_get_string(state, APPLIED_FINGERPRINT_KEY);
-		obs_data_release(state);
-	}
-	obs_data_release(priv);
-	return result;
-}
-
-void save_apply_record(obs_source_t *source, const std::string &previous_css, const std::string &applied_fingerprint)
-{
-	edit_state(source, [&](obs_data_t *state) {
-		obs_data_set_bool(state, HAS_PREVIOUS_KEY, true);
-		obs_data_set_string(state, PREVIOUS_CSS_KEY, previous_css.c_str());
-		obs_data_set_string(state, APPLIED_FINGERPRINT_KEY, applied_fingerprint.c_str());
-	});
-}
-
-void clear_apply_record(obs_source_t *source)
-{
-	edit_state(source, [](obs_data_t *state) {
-		obs_data_set_bool(state, HAS_PREVIOUS_KEY, false);
-		obs_data_erase(state, PREVIOUS_CSS_KEY);
-		obs_data_erase(state, APPLIED_FINGERPRINT_KEY);
-	});
-}
 
 core::StyleValues load_style(obs_source_t *source)
 {

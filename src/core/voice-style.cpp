@@ -57,14 +57,6 @@ std::vector<const Portrait *> usable_portraits(const std::vector<Portrait> &port
 	return result;
 }
 
-std::string group_digits(size_t value)
-{
-	std::string digits = std::to_string(value);
-	for (size_t pos = digits.size(); pos > 3; pos -= 3)
-		digits.insert(pos - 3, ",");
-	return digits;
-}
-
 } // namespace
 
 int avatar_height(const StyleValues &values)
@@ -154,46 +146,6 @@ std::string generate_css(const StyleValues &values, const std::vector<Portrait> 
 	}
 
 	return css.str();
-}
-
-std::string abbreviate_data_uris(std::string_view css, std::string_view count_format)
-{
-	static constexpr std::string_view DATA = "data:";
-	static constexpr std::string_view BASE64 = ";base64,";
-	std::string out;
-	size_t pos = 0;
-	while (true) {
-		const size_t start = css.find(DATA, pos);
-		if (start == std::string_view::npos)
-			break;
-		const size_t marker = css.find(BASE64, start);
-		// MIME タイプに使わない文字を挟む ;base64, は、この data URI のものではない
-		const std::string_view mime = css.substr(
-			start + DATA.size(), marker == std::string_view::npos ? 0 : marker - start - DATA.size());
-		const bool valid = marker != std::string_view::npos &&
-				   std::all_of(mime.begin(), mime.end(), [](char c) {
-					   return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '/' ||
-						  c == '+' || c == '-' || c == '.';
-				   });
-		if (!valid) {
-			out.append(css.substr(pos, start + DATA.size() - pos));
-			pos = start + DATA.size();
-			continue;
-		}
-		const size_t body = marker + BASE64.size();
-		size_t end = body;
-		while (end < css.size() && is_base64_char(css[end]))
-			++end;
-		out.append(css.substr(pos, body - pos));
-		std::string label(count_format);
-		const size_t slot = label.find("%1");
-		if (slot != std::string::npos)
-			label.replace(slot, 2, group_digits(end - body));
-		out += label;
-		pos = end;
-	}
-	out.append(css.substr(pos));
-	return out;
 }
 
 } // namespace sspot::core

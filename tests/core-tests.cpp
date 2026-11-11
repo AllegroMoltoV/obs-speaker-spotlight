@@ -135,19 +135,6 @@ void test_replace_ignores_other_plugin_markers()
 	CHECK(count(*result, std::string(BLOCK_BEGIN)) == 1);
 }
 
-void test_undo_decision()
-{
-	const std::string applied = css_fingerprint("applied");
-	CHECK(decide_undo(false, "applied", applied) == UndoDecision::Nothing);
-	CHECK(decide_undo(true, "applied", applied) == UndoDecision::Restore);
-	CHECK(decide_undo(true, "applied + edit", applied) == UndoDecision::RestoreWithConfirm);
-	// 同じ長さで 1 文字だけ違う書き換えも見分ける
-	CHECK(decide_undo(true, "applieD", applied) == UndoDecision::RestoreWithConfirm);
-	// FNV-1a 64 の既知の値。指紋の形式はシーンコレクションに保存されるため、変わらないことを確かめる
-	CHECK(css_fingerprint("") == "0:cbf29ce484222325");
-	CHECK(css_fingerprint("a") == "1:af63dc4c8601ec8c");
-}
-
 void test_streamkit_voice_url()
 {
 	CHECK(is_streamkit_voice_url(
@@ -567,21 +554,6 @@ void test_name_takes_its_own_line_height()
 	CHECK(css.find("inline-block") == std::string::npos);
 }
 
-void test_abbreviate_data_uris()
-{
-	const std::string image = PNG_BYTES + std::string(3000, 'x');
-	const std::string css = generate_css(StyleValues{}, {portrait_of("111", image, 0)});
-	const std::string shown = abbreviate_data_uris(css, "...(%1)");
-	const std::string encoded = base64_encode(image);
-	CHECK(shown.find(encoded) == std::string::npos);
-	const std::string digits = std::to_string(encoded.size());
-	const std::string grouped = digits.substr(0, digits.size() - 3) + "," + digits.substr(digits.size() - 3);
-	CHECK(shown.find("url(\"data:image/png;base64,...(" + grouped + ")\")") != std::string::npos);
-	// data URI の外は変えない
-	CHECK(abbreviate_data_uris(generate_css(StyleValues{}, {})) == generate_css(StyleValues{}, {}));
-	CHECK(abbreviate_data_uris("a data: b;base64,QUJD") == "a data: b;base64,QUJD");
-}
-
 void test_check_entries()
 {
 	using P = EntryProblem;
@@ -612,7 +584,6 @@ int main()
 	test_replace_twice_keeps_single_block();
 	test_replace_refuses_broken_markers();
 	test_replace_ignores_other_plugin_markers();
-	test_undo_decision();
 	test_streamkit_voice_url();
 	test_hex_color();
 	test_sanitize();
@@ -630,7 +601,6 @@ int main()
 	test_css_portraits_target_registered_users_only();
 	test_generated_css_in_managed_block();
 	test_name_takes_its_own_line_height();
-	test_abbreviate_data_uris();
 	test_check_entries();
 
 	if (failures > 0) {

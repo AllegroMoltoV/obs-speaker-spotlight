@@ -32,8 +32,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <obs-module.h>
 #include <plugin-support.h>
 
-#include <QApplication>
-#include <QClipboard>
 #include <QDateTime>
 #include <QDir>
 #include <QFileInfo>
@@ -165,31 +163,13 @@ SpeakerSpotlightDock::SpeakerSpotlightDock(QWidget *parent) : QWidget(parent)
 	preset_layout->addLayout(preset_buttons, 1, 1);
 	preset_layout->setColumnStretch(1, 1);
 
-	// 適用、元に戻す、クリップボードへ写す
 	apply_button_ = new QPushButton(text("Apply"), content);
-	undo_button_ = new QPushButton(text("Undo"), content);
-	undo_button_->setToolTip(text("Undo.Tooltip"));
-	copy_css_button_ = new QPushButton(text("CopyCss"), content);
 	auto *action_row = new QHBoxLayout();
 	action_row->addStretch();
 	action_row->addWidget(apply_button_);
-	action_row->addWidget(undo_button_);
-	action_row->addWidget(copy_css_button_);
 
 	status_label_ = new QLabel(content);
 	status_label_->setWordWrap(true);
-
-	// 生成した CSS。画像の data URI は長いため、本文を省いて表示する
-	css_toggle_button_ = new QToolButton(content);
-	css_toggle_button_->setText(text("GeneratedCss"));
-	css_toggle_button_->setCheckable(true);
-	css_toggle_button_->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
-	css_toggle_button_->setArrowType(Qt::RightArrow);
-	css_toggle_button_->setAutoRaise(true);
-	css_view_ = new QPlainTextEdit(content);
-	css_view_->setReadOnly(true);
-	css_view_->setMinimumHeight(120);
-	css_view_->setVisible(false);
 
 	layout->addWidget(source_label);
 	layout->addLayout(source_row);
@@ -199,8 +179,6 @@ SpeakerSpotlightDock::SpeakerSpotlightDock(QWidget *parent) : QWidget(parent)
 	layout->addWidget(preset_row_);
 	layout->addLayout(action_row);
 	layout->addWidget(status_label_);
-	layout->addWidget(css_toggle_button_);
-	layout->addWidget(css_view_);
 	layout->addStretch();
 
 	auto *scroll = new QScrollArea(this);
@@ -225,19 +203,12 @@ SpeakerSpotlightDock::SpeakerSpotlightDock(QWidget *parent) : QWidget(parent)
 	connect(portraits_, &PortraitList::changed, this, &SpeakerSpotlightDock::on_settings_changed);
 	connect(panel_, &SettingsPanel::changed, this, &SpeakerSpotlightDock::on_settings_changed);
 	connect(apply_button_, &QPushButton::clicked, this, &SpeakerSpotlightDock::on_apply);
-	connect(undo_button_, &QPushButton::clicked, this, &SpeakerSpotlightDock::on_undo);
-	connect(copy_css_button_, &QPushButton::clicked, this, &SpeakerSpotlightDock::on_copy_css);
 	connect(preset_load_button_, &QPushButton::clicked, this, &SpeakerSpotlightDock::on_preset_load);
 	connect(preset_save_button_, &QPushButton::clicked, this, &SpeakerSpotlightDock::on_preset_save);
 	connect(preset_delete_button_, &QPushButton::clicked, this, &SpeakerSpotlightDock::on_preset_delete);
 	connect(preset_combo_, &QComboBox::currentIndexChanged, this, [this](int index) {
 		preset_load_button_->setEnabled(index >= 0);
 		preset_delete_button_->setEnabled(index >= 0);
-	});
-	connect(css_toggle_button_, &QToolButton::toggled, this, [this](bool open) {
-		css_toggle_button_->setArrowType(open ? Qt::DownArrow : Qt::RightArrow);
-		css_view_->setVisible(open);
-		update_css_view();
 	});
 
 	refresh_presets();
@@ -293,7 +264,6 @@ void SpeakerSpotlightDock::load_settings()
 		panel_->set_values({});
 		portraits_->set_entries({});
 	}
-	update_css_view();
 }
 
 void SpeakerSpotlightDock::update_view()
@@ -304,11 +274,9 @@ void SpeakerSpotlightDock::update_view()
 	panel_->setEnabled(has_source);
 	preset_row_->setEnabled(has_source);
 	apply_button_->setEnabled(has_source);
-	copy_css_button_->setEnabled(has_source);
 	if (!source) {
 		url_warning_label_->clear();
 		url_warning_label_->setVisible(false);
-		undo_button_->setEnabled(false);
 		return;
 	}
 
@@ -316,23 +284,7 @@ void SpeakerSpotlightDock::update_view()
 	const bool streamkit = core::is_streamkit_voice_url(get_source_url(source));
 	url_warning_label_->setText(streamkit ? QString() : text("UrlWarning"));
 	url_warning_label_->setVisible(!streamkit);
-	undo_button_->setEnabled(load_source_state(source).has_previous);
 	obs_source_release(source);
-}
-
-void SpeakerSpotlightDock::update_css_view()
-{
-	// 画像のファイルを読み直すため、閉じている間は作らない
-	if (!css_toggle_button_->isChecked())
-		return;
-	const BuiltCss built = build_css();
-	if (!built.css) {
-		css_view_->setPlainText(built.error);
-		return;
-	}
-	const std::string shown =
-		core::abbreviate_data_uris(*built.css, text("GeneratedCss.Abbreviated").toStdString());
-	css_view_->setPlainText(QString::fromStdString(shown));
 }
 
 void SpeakerSpotlightDock::set_status(const QString &message)
@@ -356,7 +308,6 @@ void SpeakerSpotlightDock::on_settings_changed()
 		save_portraits(source, portraits_->entries());
 		obs_source_release(source);
 	}
-	update_css_view();
 }
 
 void SpeakerSpotlightDock::on_create_source()
@@ -483,8 +434,6 @@ void SpeakerSpotlightDock::write_managed_css(const std::string &generated)
 		return;
 	}
 	const QString name = source_name(source);
-	const SourceState state = load_source_state(source);
-
 	const std::string current = get_source_css(source);
 	const auto updated = core::replace_block(current, generated);
 	if (!updated) {
@@ -498,8 +447,6 @@ void SpeakerSpotlightDock::write_managed_css(const std::string &generated)
 		return;
 	}
 
-	// 元に戻す先は、プラグインが最初に書き換える前の css にする
-	save_apply_record(source, state.has_previous ? state.previous_css : current, core::css_fingerprint(*updated));
 	set_source_css(source, *updated);
 	obs_log(LOG_INFO, "applied CSS to browser source '%s' (%zu bytes)", name.toUtf8().constData(), updated->size());
 	obs_source_release(source);
@@ -525,57 +472,6 @@ void SpeakerSpotlightDock::on_apply()
 		return;
 	}
 	write_managed_css(*built.css);
-	update_css_view();
-}
-
-void SpeakerSpotlightDock::on_copy_css()
-{
-	const BuiltCss built = build_css();
-	if (!built.css) {
-		set_status(built.error);
-		return;
-	}
-	QApplication::clipboard()->setText(QString::fromStdString(*built.css));
-	set_status(text("CopyCss.Done"));
-}
-
-void SpeakerSpotlightDock::on_undo()
-{
-	obs_source_t *source = selected_source();
-	if (!source) {
-		set_status(text("SourceNotFound"));
-		refresh_sources();
-		return;
-	}
-	const QString name = source_name(source);
-	const SourceState state = load_source_state(source);
-	const std::string current = get_source_css(source);
-
-	switch (core::decide_undo(state.has_previous, current, state.applied_fingerprint)) {
-	case core::UndoDecision::Nothing:
-		obs_source_release(source);
-		set_status(text("Undo.Nothing"));
-		update_view();
-		return;
-	case core::UndoDecision::RestoreWithConfirm:
-		if (QMessageBox::question(this, text("DockTitle"), text("Undo.ConfirmEdited")) != QMessageBox::Yes) {
-			obs_source_release(source);
-			return;
-		}
-		break;
-	case core::UndoDecision::Restore:
-		break;
-	}
-
-	// 適用はボタンで行うため、ドックの設定と書き込んだ css は一致するとは限らない。
-	// 入力した立ち絵の組を失わないよう、戻すのは css だけにして、設定は残す
-	clear_apply_record(source);
-	set_source_css(source, state.previous_css);
-	obs_log(LOG_INFO, "restored previous CSS of browser source '%s'", name.toUtf8().constData());
-	obs_source_release(source);
-
-	set_status(text("Undo.Done").arg(name));
-	update_view();
 }
 
 void SpeakerSpotlightDock::refresh_presets(const QString &select_name)

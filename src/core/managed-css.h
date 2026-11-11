@@ -40,17 +40,4 @@ BlockState inspect_block(std::string_view css);
 // 目印が壊れているときは、利用者の CSS を消さないよう std::nullopt を返す。
 std::optional<std::string> replace_block(std::string_view css, std::string_view generated);
 
-enum class UndoDecision {
-	Nothing,            // 戻す先が無い
-	Restore,            // そのまま戻してよい
-	RestoreWithConfirm, // 適用の後に css が変わっている。戻すと変更が消えるため確かめる
-};
-
-// css の指紋。立ち絵を埋め込んだ css は数 MB になり、全文をソースの設定に二重に持つと
-// シーンコレクションのファイルが倍になるため、適用の直後の css は指紋だけを保存する
-std::string css_fingerprint(std::string_view css);
-
-// 元に戻す操作の扱いを決める。applied_fingerprint は最後に適用した直後の css の指紋
-UndoDecision decide_undo(bool has_previous, std::string_view current_css, std::string_view applied_fingerprint);
-
 } // namespace sspot::core
