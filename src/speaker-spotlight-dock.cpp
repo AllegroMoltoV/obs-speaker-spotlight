@@ -35,7 +35,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QClipboard>
 #include <QDir>
 #include <QFile>
-#include <QFileDialog>
 #include <QFileInfo>
 #include <QGridLayout>
 #include <QHBoxLayout>
@@ -187,9 +186,6 @@ SpeakerSpotlightDock::SpeakerSpotlightDock(QWidget *parent) : QWidget(parent)
 	css_view_->setMinimumHeight(120);
 	css_view_->setVisible(false);
 
-	// 実機の検証で、用意した CSS を管理範囲へ書くための操作。B2 で削除する
-	write_css_file_button_ = new QPushButton(text("WriteCssFile"), content);
-
 	layout->addWidget(source_label);
 	layout->addLayout(source_row);
 	layout->addWidget(url_warning_label_);
@@ -200,7 +196,6 @@ SpeakerSpotlightDock::SpeakerSpotlightDock(QWidget *parent) : QWidget(parent)
 	layout->addWidget(status_label_);
 	layout->addWidget(css_toggle_button_);
 	layout->addWidget(css_view_);
-	layout->addWidget(write_css_file_button_);
 	layout->addStretch();
 
 	auto *scroll = new QScrollArea(this);
@@ -227,7 +222,6 @@ SpeakerSpotlightDock::SpeakerSpotlightDock(QWidget *parent) : QWidget(parent)
 	connect(apply_button_, &QPushButton::clicked, this, &SpeakerSpotlightDock::on_apply);
 	connect(undo_button_, &QPushButton::clicked, this, &SpeakerSpotlightDock::on_undo);
 	connect(copy_css_button_, &QPushButton::clicked, this, &SpeakerSpotlightDock::on_copy_css);
-	connect(write_css_file_button_, &QPushButton::clicked, this, &SpeakerSpotlightDock::on_write_css_file);
 	connect(preset_load_button_, &QPushButton::clicked, this, &SpeakerSpotlightDock::on_preset_load);
 	connect(preset_save_button_, &QPushButton::clicked, this, &SpeakerSpotlightDock::on_preset_save);
 	connect(preset_delete_button_, &QPushButton::clicked, this, &SpeakerSpotlightDock::on_preset_delete);
@@ -306,7 +300,6 @@ void SpeakerSpotlightDock::update_view()
 	preset_row_->setEnabled(has_source);
 	apply_button_->setEnabled(has_source);
 	copy_css_button_->setEnabled(has_source);
-	write_css_file_button_->setEnabled(has_source);
 	if (!source) {
 		url_warning_label_->clear();
 		url_warning_label_->setVisible(false);
@@ -489,20 +482,6 @@ void SpeakerSpotlightDock::on_copy_css()
 	set_status(text("CopyCss.Done"));
 }
 
-void SpeakerSpotlightDock::on_write_css_file()
-{
-	const QString path =
-		QFileDialog::getOpenFileName(this, text("WriteCssFile.Title"), QString(), text("WriteCssFile.Filter"));
-	if (path.isEmpty())
-		return;
-	QFile file(path);
-	if (!file.open(QIODevice::ReadOnly)) {
-		set_status(text("WriteCssFile.ReadFailed").arg(path));
-		return;
-	}
-	const QByteArray bytes = file.readAll();
-	write_managed_css(std::string(bytes.constData(), static_cast<size_t>(bytes.size())));
-}
 
 void SpeakerSpotlightDock::on_undo()
 {

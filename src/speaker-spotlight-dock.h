@@ -64,7 +64,6 @@ private slots:
 	void on_apply();
 	void on_undo();
 	void on_copy_css();
-	void on_write_css_file();
 	void on_preset_save();
 	void on_preset_load();
 	void on_preset_delete();
@@ -106,7 +105,6 @@ private:
 	QLabel *status_label_{nullptr};
 	QToolButton *css_toggle_button_{nullptr};
 	QPlainTextEdit *css_view_{nullptr};
-	QPushButton *write_css_file_button_{nullptr};
 };
 
 } // namespace sspot
