@@ -345,14 +345,20 @@ void SpeakerSpotlightDock::apply_to_source(obs_source_t *source)
 		set_status(text("Portrait.InvalidUserId").arg(QString::number(core::MAX_USER_ID_DIGITS)));
 		return;
 	}
-	if (!update.changed) {
+	const std::optional<core::SourceSize> size =
+		core::size_update(get_source_size(source), settings.style, settings.user_id, settings.portrait);
+	if (!update.changed && !size) {
 		set_status(text("Apply.Unchanged").arg(name));
 		return;
 	}
 
-	set_source_css(source, update.css);
-	obs_log(LOG_INFO, "applied CSS to browser source '%s' (%zu bytes)", name.toUtf8().constData(),
-		update.css.size());
+	update_source(source, update.changed ? std::optional<std::string>(update.css) : std::nullopt, size);
+	if (update.changed)
+		obs_log(LOG_INFO, "applied CSS to browser source '%s' (%zu bytes)", name.toUtf8().constData(),
+			update.css.size());
+	if (size)
+		obs_log(LOG_INFO, "resized browser source '%s' to %dx%d", name.toUtf8().constData(), size->width,
+			size->height);
 	set_status(text(settings.user_id.empty() ? "Apply.Removed" : "Apply.Done").arg(name));
 }
 

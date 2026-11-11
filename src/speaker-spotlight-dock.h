@@ -79,7 +79,8 @@ private:
 	obs_source_t *selected_source() const;
 	// 選択中のソースに保存した設定を欄へ写す。ソースが無ければ既定に戻す
 	void load_settings();
-	// source に保存した設定から CSS を作り、source の css の管理範囲に書く。ユーザー ID が空なら管理範囲を外す。
+	// source に保存した設定から CSS を作り、source の css の管理範囲に書く。あわせてソースの幅と高さを中身に合わせる。
+	// ユーザー ID が空なら管理範囲を外し、大きさは変えない。
 	// 欄の操作はそのたびにソースへ保存するため、欄ではなくソースの設定を読む
 	void apply_to_source(obs_source_t *source);
 	// 選択中のソースを反映待ちにし、待ちを始め直す

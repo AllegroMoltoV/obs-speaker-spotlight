@@ -592,6 +592,76 @@ void test_name_always_hidden()
 	}
 }
 
+PortraitImage portrait_sized(int width, int height)
+{
+	return PortraitImage{ImageFormat::Png, base64_encode(PNG_BYTES), width, height};
+}
+
+StyleValues with_height(int height)
+{
+	StyleValues values;
+	values.numbers["avatar_height"] = height;
+	return values;
+}
+
+// 立ち絵は高さの設定と縦横比から幅を切り上げ、アバターは枠の分を足す
+void test_content_size()
+{
+	CHECK((content_size(with_height(150), std::nullopt) == SourceSize{156, 156}));
+	CHECK((content_size(StyleValues{}, std::nullopt) == SourceSize{156, 156}));
+	CHECK((content_size(with_height(2160), std::nullopt) == SourceSize{2166, 2166}));
+	// 高さは設定の範囲に収めてから使う
+	CHECK((content_size(with_height(9999), std::nullopt) == SourceSize{2166, 2166}));
+	CHECK((content_size(with_height(150), portrait_sized(60, 120)) == SourceSize{75, 150}));
+	// 150 x 333 / 1000 = 49.95 と 150 x 1000 / 333 = 450.45 は切り上げる
+	CHECK((content_size(with_height(150), portrait_sized(333, 1000)) == SourceSize{50, 150}));
+	CHECK((content_size(with_height(150), portrait_sized(1000, 333)) == SourceSize{451, 150}));
+	CHECK((content_size(with_height(2160), portrait_sized(1674, 2160)) == SourceSize{1674, 2160}));
+	CHECK((content_size(with_height(20), portrait_sized(1, 2160)) == SourceSize{1, 20}));
+	// CSS に出さない立ち絵はアバターとして測る
+	CHECK((content_size(with_height(150), PortraitImage{ImageFormat::Unknown, base64_encode(PNG_BYTES), 60, 120}) ==
+	       SourceSize{156, 156}));
+	// 寸法の分からない立ち絵と、int に収まらない幅では大きさを決めない
+	CHECK(!content_size(with_height(150), portrait_sized(0, 120)).has_value());
+	CHECK(!content_size(with_height(150), portrait_sized(60, 0)).has_value());
+	CHECK(!content_size(with_height(2160), portrait_sized(2147483647, 1)).has_value());
+}
+
+// 大きさは ID があるときだけ書き、今の大きさと同じなら書かない
+void test_size_update()
+{
+	const auto portrait = std::optional<PortraitImage>(portrait_sized(60, 120));
+	CHECK((size_update(SourceSize{800, 600}, with_height(150), USER_ID, portrait) ==
+	       std::optional<SourceSize>(SourceSize{75, 150})));
+	CHECK(!size_update(SourceSize{75, 150}, with_height(150), USER_ID, portrait).has_value());
+	CHECK(!size_update(SourceSize{800, 600}, with_height(150), "", portrait).has_value());
+	CHECK(!size_update(SourceSize{800, 600}, with_height(150), USER_ID, portrait_sized(0, 0)).has_value());
+
+	// CSS が書き込み済みと同じでも、ソースの大きさが違えば大きさだけを書く
+	const CssUpdate first = update_css(DEFAULT_CSS, with_height(150), USER_ID, portrait);
+	const CssUpdate again = update_css(first.css, with_height(150), USER_ID, portrait);
+	CHECK(!again.changed);
+	CHECK(size_update(SourceSize{800, 600}, with_height(150), USER_ID, portrait).has_value());
+}
+
+// 中身の外寸がソースの大きさと一致するよう、外側の余白を消し、アバターの枠の幅と箱の大きさの決め方を指定する
+void test_css_fits_source()
+{
+	const std::string css = generate_css(StyleValues{}, USER_ID);
+	for (const std::string selector : {"body", ".voice_container", ".voice_states"}) {
+		CHECK(rule_of(css, selector).find("margin: 0 !important;") != std::string::npos);
+		CHECK(rule_of(css, selector).find("padding: 0 !important;") != std::string::npos);
+	}
+	const std::string target = rule_of(css, ".voice_state[data-userid=\"111\"]");
+	CHECK(target.find("margin: 0 !important;") != std::string::npos);
+	CHECK(target.find("padding: 0 !important;") != std::string::npos);
+	const std::string avatar = rule_of(css, ".voice_state .voice_avatar");
+	CHECK(avatar.find("box-sizing: content-box !important;") != std::string::npos);
+	CHECK(avatar.find("border-width: 3px !important;") != std::string::npos);
+	CHECK(avatar.find("width: 150px !important;") != std::string::npos);
+	CHECK(avatar.find("height: 150px !important;") != std::string::npos);
+}
+
 } // namespace
 
 int main()
@@ -622,6 +692,9 @@ int main()
 	test_brighten();
 	test_portrait_usable();
 	test_name_always_hidden();
+	test_content_size();
+	test_size_update();
+	test_css_fits_source();
 
 	if (failures > 0) {
 		std::cerr << failures << " check(s) failed\n";

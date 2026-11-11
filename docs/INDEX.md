@@ -14,6 +14,7 @@ context compaction で文脈が失われた場合は、この索引から必要�
 | B1: OBS での接続、V1〜V5 の結果と仮決めの確定 | `docs/reports/2026-11-11-runtime-verification.md` |
 | 立ち絵の縮小と WebP の埋め込み: 7 枚の大きさと処理時間、既定の画質 | `docs/reports/2026-11-11-portrait-optimization.md` |
 | 立ち絵を最大 2160px で保存したときの 7 枚の大きさ、選ばれた段、保存の時間 | `docs/reports/2026-11-11-portrait-2160.md` |
+| ブラウザーソースの大きさの自動の調整: 緑の枠の分と、ローカルのページでの外寸の計測 | `docs/reports/2026-11-11-source-size.md` |
 | 開発のセッションによる OBS での細かい動作確認 | `docs/reports/2026-11-11-dev-checks.md` |
 | P6: 1 人 1 ソースと自動の反映の OBS での確認 | `docs/reports/2026-11-11-p6-checks.md` |
 | 実行ログ (生の出力。git 追跡対象外) | `.logs/` |

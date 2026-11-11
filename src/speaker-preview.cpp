@@ -31,8 +31,6 @@ namespace sspot {
 
 namespace {
 
-// StreamKit のスタイルシートの値
-constexpr int AVATAR_BORDER = 3;
 constexpr core::Rgb SPEAKING_GREEN{0x3b, 0xa5, 0x3b};
 // アバターの画像は通話に入るまで分からないため、Discord の既定のアバターの色の円で代える
 constexpr core::Rgb AVATAR_PLACEHOLDER{0x58, 0x65, 0xf2};
@@ -95,8 +93,8 @@ SpeakerPreview::Metrics SpeakerPreview::measure() const
 		l.avatar = QSize(width, height);
 		l.border = 0;
 	} else {
-		l.avatar = QSize(height + 2 * AVATAR_BORDER, height + 2 * AVATAR_BORDER);
-		l.border = AVATAR_BORDER;
+		l.avatar = QSize(height + 2 * core::AVATAR_BORDER, height + 2 * core::AVATAR_BORDER);
+		l.border = core::AVATAR_BORDER;
 	}
 	l.panel = l.avatar;
 	l.caption = fontMetrics().height() + CAPTION_GAP;

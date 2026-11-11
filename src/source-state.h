@@ -20,6 +20,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include "core/portrait.h"
 #include "core/style-schema.h"
+#include "core/voice-style.h"
 
 #include <obs.h>
 
@@ -44,7 +45,10 @@ void save_portrait(obs_source_t *source, const std::optional<core::PortraitImage
 
 std::string get_source_url(obs_source_t *source);
 std::string get_source_css(obs_source_t *source);
-// css を書き換える。ブラウザーソースはページを読み込み直す
-void set_source_css(obs_source_t *source, const std::string &css);
+core::SourceSize get_source_size(obs_source_t *source);
+// css と大きさのうち値のあるものを、obs_source_update() の 1 回で書き換える。css を変えるとブラウザーソースはページを
+// 読み込み直す。大きさだけを変えるときは読み込み直さない
+void update_source(obs_source_t *source, const std::optional<std::string> &css,
+		   const std::optional<core::SourceSize> &size);
 
 } // namespace sspot

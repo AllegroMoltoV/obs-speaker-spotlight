@@ -29,6 +29,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 namespace sspot::core {
 
+// アバターの枠の幅 (px)。StreamKit の値と同じで、生成する CSS でもこの幅を指定する
+inline constexpr int AVATAR_BORDER = 3;
+
 // 設定の値を、CSS とドックのプレビューで使う形に読んだもの。値の解釈をここだけに置く
 struct VoiceLook {
 	int avatar_height = 0;     // 立ち絵とアバターの表示の高さ (px)
@@ -74,5 +77,23 @@ struct CssUpdate {
 // 管理範囲の外の CSS は残す
 CssUpdate update_css(std::string_view current_css, const StyleValues &values, std::string_view user_id,
 		     const std::optional<PortraitImage> &portrait);
+
+// ブラウザーソースの幅と高さ (px)
+struct SourceSize {
+	int width = 0;
+	int height = 0;
+
+	bool operator==(const SourceSize &other) const { return width == other.width && height == other.height; }
+	bool operator!=(const SourceSize &other) const { return !(*this == other); }
+};
+
+// generate_css() が表示する中身の外寸。立ち絵は高さの設定と保存した画像の縦横比から幅を切り上げ、
+// アバターは高さの設定に上下左右の枠を足す。立ち絵の寸法が分からないとき、大きすぎるときは nullopt を返す
+std::optional<SourceSize> content_size(const StyleValues &values, const std::optional<PortraitImage> &portrait);
+
+// 反映のときにソースへ書く大きさ。user_id が空でプラグインの CSS を書かないとき、大きさが分からないとき、
+// 今の大きさと同じときは nullopt を返す
+std::optional<SourceSize> size_update(SourceSize current, const StyleValues &values, std::string_view user_id,
+				      const std::optional<PortraitImage> &portrait);
 
 } // namespace sspot::core

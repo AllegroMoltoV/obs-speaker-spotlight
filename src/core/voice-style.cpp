@@ -23,6 +23,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "streamkit-dom.h"
 
 #include <algorithm>
+#include <limits>
 #include <utility>
 
 namespace sspot::core {
@@ -93,9 +94,16 @@ std::string generate_css(const StyleValues &values, std::string_view user_id,
 
 	const int height = look.avatar_height;
 
-	css.add(std::string(sk::BODY), "background-color", "rgba(0, 0, 0, 0)");
+	// ソースの大きさを中身の外寸に合わせるため、中身の外側の余白をすべて 0 にする
+	const std::string body(sk::BODY);
+	const std::string container(sk::CONTAINER);
+	css.add(body, "background-color", "rgba(0, 0, 0, 0)");
+	css.add(body, "margin", "0");
+	css.add(body, "padding", "0");
+	css.add(container, "margin", "0");
+	css.add(container, "padding", "0");
 
-	// 1 人だけを残し、一覧の余白を除いて左上に置く。配置と重なり順は OBS のシーンで決める
+	// 1 人だけを残し、左上に置く。配置と重なり順は OBS のシーンで決める
 	css.add(list, "margin", "0");
 	css.add(list, "padding", "0");
 	css.add(item, "display", "none");
@@ -103,13 +111,16 @@ std::string generate_css(const StyleValues &values, std::string_view user_id,
 	css.add(target, "display", "flex");
 	css.add(target, "flex-direction", "row");
 	css.add(target, "align-items", "center");
-	css.add(target, "gap", "8px");
 	css.add(target, "height", "auto");
 	css.add(target, "margin", "0");
+	css.add(target, "padding", "0");
 
 	css.add(avatar, "float", "none");
 	css.add(avatar, "flex-shrink", "0");
 	css.add(avatar, "margin", "0");
+	// 外寸を content_size() と一致させるため、枠の幅と、枠を幅と高さの外に足すことを指定する
+	css.add(avatar, "box-sizing", "content-box");
+	css.add(avatar, "border-width", css::px(AVATAR_BORDER));
 	css.add(avatar, "width", css::px(height));
 	css.add(avatar, "height", css::px(height));
 	css.add(avatar, "filter", "brightness(" + css::ratio_text(look.idle_brightness) + ")");
@@ -135,6 +146,32 @@ std::string generate_css(const StyleValues &values, std::string_view user_id,
 	}
 
 	return css.str();
+}
+
+std::optional<SourceSize> content_size(const StyleValues &values, const std::optional<PortraitImage> &portrait)
+{
+	const long long height = resolve_look(values).avatar_height;
+	if (!portrait || !portrait_usable(*portrait))
+		return SourceSize{static_cast<int>(height) + 2 * AVATAR_BORDER,
+				  static_cast<int>(height) + 2 * AVATAR_BORDER};
+	if (portrait->width <= 0 || portrait->height <= 0)
+		return std::nullopt;
+	// img の幅は高さ × 縦横比の小数になるため、切り上げてソースに収める
+	const long long width = (height * portrait->width + portrait->height - 1) / portrait->height;
+	if (width > std::numeric_limits<int>::max())
+		return std::nullopt;
+	return SourceSize{static_cast<int>(width), static_cast<int>(height)};
+}
+
+std::optional<SourceSize> size_update(SourceSize current, const StyleValues &values, std::string_view user_id,
+				      const std::optional<PortraitImage> &portrait)
+{
+	if (user_id.empty())
+		return std::nullopt;
+	const std::optional<SourceSize> size = content_size(values, portrait);
+	if (!size || *size == current)
+		return std::nullopt;
+	return size;
 }
 
 CssUpdate update_css(std::string_view current_css, const StyleValues &values, std::string_view user_id,

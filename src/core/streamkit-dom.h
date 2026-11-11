@@ -27,6 +27,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 namespace sspot::core::streamkit {
 
 inline constexpr std::string_view BODY = "body";
+inline constexpr std::string_view CONTAINER = ".voice_container"; // 一覧を包む div
 inline constexpr std::string_view LIST = ".voice_states";         // 参加者の一覧の ul
 inline constexpr std::string_view ITEM = ".voice_state";          // 1 人分の li
 inline constexpr std::string_view SPEAKING = ".wrapper_speaking"; // 話している人の li に付く

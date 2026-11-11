@@ -131,10 +131,27 @@ std::string get_source_css(obs_source_t *source)
 	return get_string_setting(source, "css");
 }
 
-void set_source_css(obs_source_t *source, const std::string &css)
+core::SourceSize get_source_size(obs_source_t *source)
 {
+	obs_data_t *settings = obs_source_get_settings(source);
+	const core::SourceSize size{static_cast<int>(obs_data_get_int(settings, "width")),
+				    static_cast<int>(obs_data_get_int(settings, "height"))};
+	obs_data_release(settings);
+	return size;
+}
+
+void update_source(obs_source_t *source, const std::optional<std::string> &css,
+		   const std::optional<core::SourceSize> &size)
+{
+	if (!css && !size)
+		return;
 	obs_data_t *update = obs_data_create();
-	obs_data_set_string(update, "css", css.c_str());
+	if (css)
+		obs_data_set_string(update, "css", css->c_str());
+	if (size) {
+		obs_data_set_int(update, "width", size->width);
+		obs_data_set_int(update, "height", size->height);
+	}
 	obs_source_update(source, update);
 	obs_data_release(update);
 }

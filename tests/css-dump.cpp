@@ -17,18 +17,23 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 */
 
 // 生成した CSS を、ローカルのページに注入して表示を確かめるためにファイルへ書き出す。
-// 使い方: speaker-spotlight-css-dump <出力先のフォルダー> [ユーザー ID]
+// 使い方: speaker-spotlight-css-dump <出力先のフォルダー> [ユーザー ID] [<高さ> <PNG のファイル>...]
 // default.css (既定値)、max.css (数値を最大、緑の枠なし)、min.css (数値を最小) にはテスト画像の立ち絵を入れ、
 // avatar.css (既定値) には入れない。
-// ユーザー ID を省くと 100000000000000001 にする
+// ユーザー ID を省くと 100000000000000001 にする。
+// 高さを渡すと、その高さで、立ち絵なしの size-avatar.css と、PNG ごとの size-<番号>.css も書く。
+// その行には、content_size() で求めたソースの幅と高さをタブ区切りで添える
 
 #include "core/portrait.h"
 #include "core/voice-style.h"
 
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <optional>
 #include <string>
+#include <utility>
+#include <vector>
 
 using namespace sspot::core;
 
@@ -62,6 +67,25 @@ StyleValues extreme_values(bool use_max)
 	if (use_max)
 		values.numbers["speaking_border_visible"] = 0;
 	return values;
+}
+
+std::optional<std::string> read_file(const std::string &path)
+{
+	std::ifstream in(path, std::ios::binary);
+	if (!in)
+		return std::nullopt;
+	return std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+}
+
+// PNG の IHDR の幅 (offset 16) と高さ (offset 20)。PNG でなければ 0 を返す
+int png_dimension(const std::string &bytes, std::size_t offset)
+{
+	if (detect_image_format(bytes) != ImageFormat::Png || bytes.size() < offset + 4)
+		return 0;
+	int value = 0;
+	for (std::size_t i = 0; i < 4; ++i)
+		value = value * 256 + static_cast<unsigned char>(bytes[offset + i]);
+	return value;
 }
 
 bool write_file(const std::string &path, const std::string &text)
@@ -107,6 +131,31 @@ int main(int argc, char **argv)
 			return 1;
 		}
 		std::cout << path << '\n';
+	}
+
+	if (argc < 4)
+		return 0;
+	StyleValues sized;
+	sized.numbers["avatar_height"] = std::stoi(argv[3]);
+	std::vector<std::pair<std::string, std::optional<PortraitImage>>> cases = {{"size-avatar.css", std::nullopt}};
+	for (int i = 4; i < argc; ++i) {
+		const std::optional<std::string> bytes = read_file(argv[i]);
+		if (!bytes) {
+			std::cerr << "failed to read " << argv[i] << '\n';
+			return 1;
+		}
+		cases.emplace_back("size-" + std::to_string(i - 3) + ".css",
+				   PortraitImage{detect_image_format(*bytes), base64_encode(*bytes),
+						 png_dimension(*bytes, 16), png_dimension(*bytes, 20)});
+	}
+	for (const auto &[name, image] : cases) {
+		const std::string path = dir + "/" + name;
+		const std::optional<SourceSize> size = content_size(sized, image);
+		if (!size || !write_file(path, generate_css(sized, user_id, image))) {
+			std::cerr << "failed to write " << path << '\n';
+			return 1;
+		}
+		std::cout << path << '\t' << size->width << '\t' << size->height << '\n';
 	}
 	return 0;
 }
