@@ -25,8 +25,8 @@ if(ENABLE_FRONTEND_API)
 endif()
 
 if(ENABLE_QT)
-  find_package(Qt6 REQUIRED COMPONENTS Widgets Core)
-  target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE Qt6::Core Qt6::Widgets)
+  find_package(Qt6 REQUIRED COMPONENTS Widgets Gui Core)
+  target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE Qt6::Core Qt6::Gui Qt6::Widgets)
   target_compile_options(
     ${CMAKE_PROJECT_NAME}
     PRIVATE $<$<C_COMPILER_ID:Clang,AppleClang>:-Wno-quoted-include-in-framework-header -Wno-comma>
@@ -71,6 +71,14 @@ if(ENABLE_TESTS)
   add_executable(speaker-spotlight-css-dump tests/css-dump.cpp ${CORE_SOURCES})
   target_compile_features(speaker-spotlight-css-dump PRIVATE cxx_std_17)
   target_include_directories(speaker-spotlight-css-dump PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+
+  # 立ち絵の縮小と書き出しの大きさと時間を計る道具。Qt の webp のプラグインの有無が環境で違うため、ctest には登録しない
+  if(ENABLE_QT)
+    add_executable(speaker-spotlight-image-bench tests/image-bench.cpp src/portrait-image.cpp ${CORE_SOURCES})
+    target_compile_features(speaker-spotlight-image-bench PRIVATE cxx_std_17)
+    target_include_directories(speaker-spotlight-image-bench PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+    target_link_libraries(speaker-spotlight-image-bench PRIVATE Qt6::Core Qt6::Gui)
+  endif()
 endif()
 
 # ビルド直後に cmake --install を実行する (Windows 開発用)

@@ -18,10 +18,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include "portrait-list.h"
 
+#include "portrait-image.h"
+
 #include <obs-module.h>
 
 #include <QDir>
-#include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFormLayout>
@@ -32,8 +33,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include <algorithm>
 #include <cstddef>
-#include <string>
-#include <string_view>
 
 namespace sspot {
 
@@ -60,10 +59,11 @@ QString image_problem_text(core::ImageProblem problem)
 	case core::ImageProblem::ExtensionMismatch:
 		return text("ImageProblem.ExtensionMismatch");
 	case core::ImageProblem::TooLarge:
-		return text("ImageProblem.TooLarge").arg(QString::number(core::MAX_IMAGE_BYTES / BYTES_PER_MB));
-	case core::ImageProblem::TotalTooLarge:
-		return text("ImageProblem.TotalTooLarge")
-			.arg(QString::number(core::MAX_TOTAL_IMAGE_BYTES / BYTES_PER_MB));
+		return text("ImageProblem.TooLarge").arg(QString::number(core::MAX_SOURCE_FILE_BYTES / BYTES_PER_MB));
+	case core::ImageProblem::TooManyPixels:
+		return text("ImageProblem.TooManyPixels");
+	case core::ImageProblem::Unreadable:
+		return text("Portrait.ReadFailed");
 	}
 	return {};
 }
@@ -84,6 +84,11 @@ PortraitRow::PortraitRow(QWidget *parent) : QGroupBox(parent)
 	auto *image_row = new QHBoxLayout();
 	image_row->addWidget(image_label_, 1);
 	image_row->addWidget(choose_button_);
+	embedded_label_ = new QLabel(this);
+	embedded_label_->setVisible(false);
+	auto *image_field = new QVBoxLayout();
+	image_field->addLayout(image_row);
+	image_field->addWidget(embedded_label_);
 
 	memo_edit_ = new QLineEdit(this);
 
@@ -105,7 +110,7 @@ PortraitRow::PortraitRow(QWidget *parent) : QGroupBox(parent)
 	auto *form = new QFormLayout(this);
 	form->setRowWrapPolicy(QFormLayout::WrapLongRows);
 	form->addRow(text("Portrait.UserId"), user_id_edit_);
-	form->addRow(text("Portrait.Image"), image_row);
+	form->addRow(text("Portrait.Image"), image_field);
 	form->addRow(text("Portrait.Memo"), memo_edit_);
 	form->addRow(button_row);
 
@@ -137,6 +142,13 @@ void PortraitRow::set_image_path(const QString &path)
 	image_path_ = path;
 	image_label_->setText(path.isEmpty() ? text("Portrait.NoImage") : QFileInfo(path).fileName());
 	image_label_->setToolTip(QDir::toNativeSeparators(path));
+	set_embedded_text({});
+}
+
+void PortraitRow::set_embedded_text(const QString &text)
+{
+	embedded_label_->setText(text);
+	embedded_label_->setVisible(!text.isEmpty());
 }
 
 void PortraitRow::set_position(int index, int count)
@@ -181,6 +193,12 @@ void PortraitList::set_entries(const std::vector<core::PortraitEntry> &entries)
 	for (const auto &entry : entries)
 		add_row(entry);
 	relayout();
+}
+
+void PortraitList::set_embedded_texts(const std::vector<QString> &texts)
+{
+	for (std::size_t i = 0; i < rows_.size(); ++i)
+		rows_[i]->set_embedded_text(i < texts.size() ? texts[i] : QString());
 }
 
 PortraitRow *PortraitList::add_row(const core::PortraitEntry &entry)
@@ -245,41 +263,10 @@ void PortraitList::choose_image(PortraitRow *row)
 		return;
 
 	const QFileInfo info(path);
-	const QString name = info.fileName();
-	const auto reject = [&](const QString &reason) {
-		QMessageBox::warning(this, text("Portrait.ChooseTitle"), text("Portrait.Rejected").arg(name, reason));
-	};
-
-	// 大きすぎるファイルを読み込まないよう、読む前に大きさを確かめる
-	const auto size = static_cast<std::size_t>(std::max<qint64>(info.size(), 0));
-	core::ImageProblem problem = core::check_image_size(size);
-	if (problem == core::ImageProblem::None) {
-		// 差し替えのときは、差し替える前の画像を合計から除く
-		std::vector<std::size_t> others;
-		for (const PortraitRow *other : rows_) {
-			if (other == row || other->image_path().isEmpty())
-				continue;
-			const QFileInfo other_info(other->image_path());
-			if (other_info.exists())
-				others.push_back(static_cast<std::size_t>(std::max<qint64>(other_info.size(), 0)));
-		}
-		problem = core::check_total_image_size(others, size);
-	}
+	const core::ImageProblem problem = inspect_source_image(path);
 	if (problem != core::ImageProblem::None) {
-		reject(image_problem_text(problem));
-		return;
-	}
-
-	QFile file(path);
-	if (!file.open(QIODevice::ReadOnly)) {
-		reject(text("Portrait.ReadFailed"));
-		return;
-	}
-	const QByteArray bytes = file.readAll();
-	problem = core::check_image(name.toStdString(),
-				    std::string_view(bytes.constData(), static_cast<std::size_t>(bytes.size())));
-	if (problem != core::ImageProblem::None) {
-		reject(image_problem_text(problem));
+		QMessageBox::warning(this, text("Portrait.ChooseTitle"),
+				     text("Portrait.Rejected").arg(info.fileName(), image_problem_text(problem)));
 		return;
 	}
 

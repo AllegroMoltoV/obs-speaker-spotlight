@@ -23,6 +23,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "core/streamkit-url.h"
 #include "core/voice-style.h"
 #include "create-source-dialog.h"
+#include "portrait-image.h"
 #include "portrait-list.h"
 #include "preset-store.h"
 #include "settings-widgets.h"
@@ -33,8 +34,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include <QApplication>
 #include <QClipboard>
+#include <QDateTime>
 #include <QDir>
-#include <QFile>
 #include <QFileInfo>
 #include <QGridLayout>
 #include <QHBoxLayout>
@@ -47,7 +48,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include <algorithm>
 #include <cstring>
-#include <string_view>
+#include <set>
 #include <utility>
 #include <vector>
 
@@ -99,9 +100,13 @@ QString entry_problem_text(core::EntryProblem problem)
 	return {};
 }
 
-std::size_t file_size(const QFileInfo &info)
+constexpr std::size_t BYTES_PER_MB = 1048576;
+
+QString embedded_text(const core::EncodedImage &image, const core::EmbedStep &step)
 {
-	return static_cast<std::size_t>(std::max<qint64>(info.size(), 0));
+	const std::size_t kb = std::max<std::size_t>((image.bytes.size() + 512) / 1024, 1);
+	const QString format = image.format == core::ImageFormat::Webp ? QStringLiteral("WebP") : QStringLiteral("PNG");
+	return text("Portrait.Embedded").arg(QString::number(kb), format, QString::number(step.scale_percent / 100.0));
 }
 
 } // namespace
@@ -367,7 +372,7 @@ void SpeakerSpotlightDock::on_create_source()
 	set_status(text("CreateSource.Created"));
 }
 
-SpeakerSpotlightDock::BuiltCss SpeakerSpotlightDock::build_css() const
+SpeakerSpotlightDock::BuiltCss SpeakerSpotlightDock::build_css()
 {
 	const std::vector<core::PortraitEntry> entries = portraits_->entries();
 	const core::EntryCheck check = core::check_entries(entries);
@@ -377,43 +382,95 @@ SpeakerSpotlightDock::BuiltCss SpeakerSpotlightDock::build_css() const
 	if (check.problem != core::EntryProblem::None)
 		return problem_at(check.index, entry_problem_text(check.problem));
 
-	std::vector<core::Portrait> portraits;
-	std::vector<std::size_t> sizes;
+	struct Source {
+		std::size_t entry = 0;
+		QString path;
+		qint64 modified = 0;
+		qint64 size = 0;
+	};
+	std::vector<Source> sources;
 	for (std::size_t i = 0; i < entries.size(); ++i) {
 		const core::PortraitEntry &entry = entries[i];
 		if (entry.user_id.empty() && entry.image_path.empty())
 			continue;
-
 		const QString path = QString::fromStdString(entry.image_path);
 		const QFileInfo info(path);
 		if (!info.isFile())
 			return problem_at(i, text("Portrait.NotFound").arg(QDir::toNativeSeparators(path)));
-		// 選んだ後にファイルが差し替えられていることがあるため、選んだときと同じ検査をやり直す。
-		// 大きすぎるファイルを読み込まないよう、読む前に大きさを確かめる
-		core::ImageProblem problem = core::check_image_size(file_size(info));
+		// 選んだ後にファイルが差し替えられていることがあるため、選んだときと同じ検査をやり直す
+		const core::ImageProblem problem = inspect_source_image(path);
 		if (problem != core::ImageProblem::None)
 			return problem_at(i, image_problem_text(problem));
+		sources.push_back({i, path, info.lastModified().toMSecsSinceEpoch(), info.size()});
+	}
 
-		QFile file(path);
-		if (!file.open(QIODevice::ReadOnly))
-			return problem_at(i, text("Portrait.ReadFailed"));
-		const QByteArray bytes = file.readAll();
-		const std::string_view view(bytes.constData(), static_cast<std::size_t>(bytes.size()));
-		problem = core::check_image(info.fileName().toStdString(), view);
-		if (problem == core::ImageProblem::None)
-			problem = core::check_total_image_size(sizes, view.size());
-		if (problem != core::ImageProblem::None)
-			return problem_at(i, image_problem_text(problem));
+	const int height = core::avatar_height(panel_->values());
+	const core::ImageFormat format = embed_format();
+	const bool lossy = format == core::ImageFormat::Webp;
+	const std::vector<core::EmbedStep> steps = core::embed_steps(lossy);
 
-		sizes.push_back(view.size());
+	std::set<EmbedKey> used;
+	// 元の画像は大きいことがあるため、読んだ画素は直前の 1 枚だけを持つ
+	std::optional<std::size_t> loaded_index;
+	QImage loaded;
+	core::ImageProblem load_problem = core::ImageProblem::None;
+	const core::EmbedEncoder encode = [&](std::size_t index,
+					      const core::EmbedStep &step) -> std::optional<core::EncodedImage> {
+		const Source &source = sources[index];
+		const int target_height = height * step.scale_percent / 100;
+		const EmbedKey key{source.path,   source.modified,          source.size,
+				   target_height, lossy ? step.quality : 0, format};
+		used.insert(key);
+		if (const auto it = embed_cache_.find(key); it != embed_cache_.end())
+			return it->second;
+		if (loaded_index != index) {
+			LoadedImage result = load_source_image(source.path);
+			if (result.problem != core::ImageProblem::None) {
+				load_problem = result.problem;
+				return std::nullopt;
+			}
+			loaded = std::move(result.image);
+			loaded_index = index;
+		}
+		std::optional<core::EncodedImage> image = encode_portrait(loaded, target_height, format, step.quality);
+		if (image)
+			embed_cache_[key] = *image;
+		return image;
+	};
+	const core::EmbedPlan plan = core::plan_embedding(sources.size(), steps, encode);
+	for (auto it = embed_cache_.begin(); it != embed_cache_.end();)
+		it = used.count(it->first) ? std::next(it) : embed_cache_.erase(it);
+
+	switch (plan.problem) {
+	case core::EmbedProblem::None:
+		break;
+	case core::EmbedProblem::EncodeFailed:
+		return problem_at(sources[plan.index].entry, load_problem != core::ImageProblem::None
+								     ? image_problem_text(load_problem)
+								     : text("Embed.EncodeFailed"));
+	case core::EmbedProblem::TooLarge:
+		return problem_at(sources[plan.index].entry,
+				  text("Embed.TooLarge").arg(QString::number(core::MAX_IMAGE_BYTES / BYTES_PER_MB)));
+	case core::EmbedProblem::TotalTooLarge:
+		return {std::nullopt,
+			text("Embed.TotalTooLarge").arg(QString::number(core::MAX_TOTAL_IMAGE_BYTES / BYTES_PER_MB))};
+	}
+
+	std::vector<core::Portrait> portraits;
+	std::vector<QString> embedded(entries.size());
+	for (std::size_t k = 0; k < sources.size(); ++k) {
+		const core::PortraitEntry &entry = entries[sources[k].entry];
+		const core::EmbeddedImage &chosen = plan.images[k];
+		embedded[sources[k].entry] = embedded_text(chosen.image, steps[chosen.step_index]);
 		core::Portrait portrait;
 		portrait.user_id = entry.user_id;
-		portrait.format = core::detect_image_format(view);
-		portrait.base64 = core::base64_encode(view);
+		portrait.format = chosen.image.format;
+		portrait.base64 = core::base64_encode(chosen.image.bytes);
 		portrait.order = static_cast<int>(portraits.size());
 		portrait.memo = entry.memo;
 		portraits.push_back(std::move(portrait));
 	}
+	portraits_->set_embedded_texts(embedded);
 	return {core::generate_css(panel_->values(), portraits), {}};
 }
 

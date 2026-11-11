@@ -20,15 +20,18 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include "core/css-builder.h"
 #include "core/managed-css.h"
+#include "core/portrait-embed.h"
 #include "core/portrait.h"
 #include "core/streamkit-url.h"
 #include "core/style-schema.h"
 #include "core/voice-style.h"
 
 #include <iostream>
+#include <map>
 #include <optional>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -215,6 +218,7 @@ void test_css_string()
 
 const std::string PNG_BYTES = std::string("\x89PNG\r\n\x1a\n", 8) + "rest-of-png";
 const std::string JPEG_BYTES = std::string("\xff\xd8\xff\xe0", 4) + "rest-of-jpeg";
+const std::string WEBP_BYTES = std::string("RIFF\x10\x00\x00\x00WEBPVP8L", 16) + "rest-of-webp";
 
 void test_user_id()
 {
@@ -244,26 +248,168 @@ void test_image_format()
 	CHECK(check_image("a.gif", PNG_BYTES) == ImageProblem::UnsupportedExtension);
 	CHECK(check_image("a.png.txt", PNG_BYTES) == ImageProblem::UnsupportedExtension);
 	CHECK(check_image("png", PNG_BYTES) == ImageProblem::UnsupportedExtension);
+	// 元の画像として受け付けるのは PNG と JPEG だけ
+	CHECK(check_image("a.webp", WEBP_BYTES) == ImageProblem::UnsupportedExtension);
+	CHECK(check_image("a.png", WEBP_BYTES) == ImageProblem::ExtensionMismatch);
+	CHECK(detect_image_format(std::string("RIFF\x10\x00\x00\x00WAVE", 12)) == ImageFormat::Unknown);
 	CHECK(mime_type(detect_image_format(PNG_BYTES)) == "image/png");
 	CHECK(mime_type(detect_image_format(JPEG_BYTES)) == "image/jpeg");
+	CHECK(mime_type(detect_image_format(WEBP_BYTES)) == "image/webp");
 }
 
-void test_image_size_limits()
+void test_source_limits()
 {
-	std::string at_limit = PNG_BYTES;
-	at_limit.resize(MAX_IMAGE_BYTES, '\0');
-	CHECK(check_image("a.png", at_limit) == ImageProblem::None);
-	CHECK(check_image("a.png", at_limit + '\0') == ImageProblem::TooLarge);
-	CHECK(check_image_size(MAX_IMAGE_BYTES) == ImageProblem::None);
-	CHECK(check_image_size(MAX_IMAGE_BYTES + 1) == ImageProblem::TooLarge);
+	CHECK(check_source_size(MAX_SOURCE_FILE_BYTES) == ImageProblem::None);
+	CHECK(check_source_size(MAX_SOURCE_FILE_BYTES + 1) == ImageProblem::TooLarge);
+	// 元の画像の 1 MB の上限は外したため、1 MB を超えるファイルも受け付ける
+	CHECK(check_source_size(MAX_IMAGE_BYTES + 1) == ImageProblem::None);
 
-	const std::vector<std::size_t> three = {MAX_IMAGE_BYTES, MAX_IMAGE_BYTES, MAX_IMAGE_BYTES};
-	CHECK(check_total_image_size(three, MAX_IMAGE_BYTES) == ImageProblem::None);
-	CHECK(check_total_image_size(three, MAX_IMAGE_BYTES + 1) == ImageProblem::TotalTooLarge);
-	const std::vector<std::size_t> four = {MAX_IMAGE_BYTES, MAX_IMAGE_BYTES, MAX_IMAGE_BYTES, MAX_IMAGE_BYTES};
-	CHECK(check_total_image_size(four, 1) == ImageProblem::TotalTooLarge);
-	CHECK(check_total_image_size({}, 0) == ImageProblem::None);
-	CHECK(check_total_image_size({static_cast<std::size_t>(-1)}, 1) == ImageProblem::TotalTooLarge);
+	CHECK(check_source_dimensions(10000, 10000) == ImageProblem::None);
+	CHECK(check_source_dimensions(10000, 10001) == ImageProblem::TooManyPixels);
+	CHECK(check_source_dimensions(1, 100000000) == ImageProblem::None);
+	CHECK(check_source_dimensions(2, 50000001) == ImageProblem::TooManyPixels);
+	CHECK(check_source_dimensions(2147483647, 2147483647) == ImageProblem::TooManyPixels);
+	CHECK(check_source_dimensions(0, 100) == ImageProblem::Unreadable);
+	CHECK(check_source_dimensions(-1, -1) == ImageProblem::Unreadable);
+}
+
+// 段ごとに決まった大きさを返す偽のエンコーダー。sizes[画像の位置][段の位置] のバイト数の画像を返し、呼ばれた組を記録する
+struct FakeEncoder {
+	std::vector<std::vector<std::size_t>> sizes;
+	std::vector<EmbedStep> steps;
+	std::vector<std::pair<std::size_t, std::size_t>> calls;
+	std::optional<std::size_t> failing_index;
+
+	std::optional<EncodedImage> operator()(std::size_t index, const EmbedStep &step)
+	{
+		std::size_t position = 0;
+		while (position < steps.size() && !(steps[position] == step))
+			++position;
+		calls.emplace_back(index, position);
+		if (failing_index == index)
+			return std::nullopt;
+		return EncodedImage{ImageFormat::Webp, std::string(sizes[index][position], 'x')};
+	}
+};
+
+EmbedPlan run_plan(FakeEncoder &fake)
+{
+	return plan_embedding(fake.sizes.size(), fake.steps,
+			      [&fake](std::size_t index, const EmbedStep &step) { return fake(index, step); });
+}
+
+std::vector<std::size_t> chosen_steps(const EmbedPlan &plan)
+{
+	std::vector<std::size_t> result;
+	for (const auto &image : plan.images)
+		result.push_back(image.step_index);
+	return result;
+}
+
+void test_embed_steps()
+{
+	const std::vector<EmbedStep> webp = embed_steps(true);
+	CHECK(webp.size() >= 4);
+	CHECK((webp[0] == EmbedStep{200, WEBP_DEFAULT_QUALITY}));
+	CHECK((webp[1] == EmbedStep{150, WEBP_DEFAULT_QUALITY}));
+	CHECK((webp[2] == EmbedStep{100, WEBP_DEFAULT_QUALITY}));
+	// 倍率を 1 まで下げた後は、倍率を保ったまま画質だけを下げる
+	for (std::size_t i = 3; i < webp.size(); ++i) {
+		CHECK(webp[i].scale_percent == 100);
+		CHECK(webp[i].quality < webp[i - 1].quality);
+	}
+	const std::vector<EmbedStep> png = embed_steps(false);
+	CHECK(png.size() == 3);
+	CHECK(png[0].scale_percent == 200 && png[1].scale_percent == 150 && png[2].scale_percent == 100);
+}
+
+void test_embed_plan_per_image()
+{
+	const std::size_t over = MAX_IMAGE_BYTES + 1;
+	FakeEncoder fake;
+	fake.steps = embed_steps(true);
+	const std::size_t last = fake.steps.size() - 1;
+	std::vector<std::size_t> shrinking(fake.steps.size(), over);
+	shrinking[last] = MAX_IMAGE_BYTES;
+	fake.sizes = {
+		std::vector<std::size_t>(fake.steps.size(), 1000), // 最初の段で収まる
+		{over, MAX_IMAGE_BYTES, 10, 10, 10, 10},           // 1.5 倍で上限ちょうどに収まる
+		shrinking,                                         // 最後の段で収まる
+	};
+	fake.sizes[1].resize(fake.steps.size(), 10);
+	const EmbedPlan plan = run_plan(fake);
+	CHECK(plan.problem == EmbedProblem::None);
+	CHECK((chosen_steps(plan) == std::vector<std::size_t>{0, 1, last}));
+	CHECK(plan.images[1].image.bytes.size() == MAX_IMAGE_BYTES);
+	CHECK(plan.images[0].image.format == ImageFormat::Webp);
+	// 収まった画像の、それより後の段は書き出さない
+	for (const auto &[index, position] : fake.calls)
+		CHECK(position <= chosen_steps(plan)[index]);
+
+	FakeEncoder too_large = fake;
+	too_large.calls.clear();
+	too_large.sizes[2][last] = over;
+	const EmbedPlan failed = run_plan(too_large);
+	CHECK(failed.problem == EmbedProblem::TooLarge);
+	CHECK(failed.index == 2);
+	CHECK(failed.images.empty());
+
+	FakeEncoder broken = fake;
+	broken.failing_index = 1;
+	const EmbedPlan not_encoded = run_plan(broken);
+	CHECK(not_encoded.problem == EmbedProblem::EncodeFailed);
+	CHECK(not_encoded.index == 1);
+}
+
+void test_embed_plan_total()
+{
+	FakeEncoder fake;
+	fake.steps = embed_steps(true);
+	const std::size_t count = fake.steps.size();
+	// 5 枚は最初の段で 1 MB に収まるが、合計は 5 MB 近い。2 段目で合計が 4 MB を下回る
+	const std::size_t big = MAX_IMAGE_BYTES - 1000;
+	const std::size_t mid = MAX_TOTAL_IMAGE_BYTES / 5 - 1000;
+	std::vector<std::size_t> row(count, 100);
+	row[0] = big;
+	row[1] = mid;
+	fake.sizes.assign(6, row);
+	// 1 枚だけは最初から小さい
+	fake.sizes[5].assign(count, 100);
+	EmbedPlan plan = run_plan(fake);
+	CHECK(plan.problem == EmbedProblem::None);
+	// 合計の超過では、収まっていた画像も含めて全員を同じ段へ下げる
+	CHECK((chosen_steps(plan) == std::vector<std::size_t>{1, 1, 1, 1, 1, 1}));
+	std::size_t total = 0;
+	for (const auto &image : plan.images)
+		total += image.image.bytes.size();
+	CHECK(total <= MAX_TOTAL_IMAGE_BYTES);
+
+	// 1 枚の上限で先に下げた画像は、全員の下限より後ろの段を保つ
+	fake.sizes[0].assign(count, 100);
+	fake.sizes[0][0] = MAX_IMAGE_BYTES + 1;
+	fake.sizes[0][1] = MAX_IMAGE_BYTES + 1;
+	fake.sizes[0][2] = 10000;
+	fake.calls.clear();
+	plan = run_plan(fake);
+	CHECK(plan.problem == EmbedProblem::None);
+	CHECK((chosen_steps(plan) == std::vector<std::size_t>{2, 1, 1, 1, 1, 1}));
+
+	// 最後の段でも合計が上限を超えるときは止める
+	FakeEncoder heavy;
+	heavy.steps = fake.steps;
+	heavy.sizes.assign(5, std::vector<std::size_t>(count, MAX_IMAGE_BYTES));
+	const EmbedPlan failed = run_plan(heavy);
+	CHECK(failed.problem == EmbedProblem::TotalTooLarge);
+	CHECK(failed.images.empty());
+
+	// 合計がちょうど上限なら収まる
+	FakeEncoder exact;
+	exact.steps = fake.steps;
+	exact.sizes.assign(4, std::vector<std::size_t>(count, MAX_IMAGE_BYTES));
+	CHECK(run_plan(exact).problem == EmbedProblem::None);
+
+	CHECK(plan_embedding(0, fake.steps, [](std::size_t, const EmbedStep &) { return std::nullopt; }).problem ==
+	      EmbedProblem::None);
 }
 
 void test_base64()
@@ -334,6 +480,18 @@ void test_css_has_no_external_resources()
 		}
 		CHECK(urls == 2);
 	}
+
+	// 縮小して書き出した WebP の立ち絵も、data URI の中に MIME とともに入る
+	const std::vector<Portrait> webp = {portrait_of("444", WEBP_BYTES, 0)};
+	const std::string css = generate_css(StyleValues{}, webp);
+	CHECK(css.find("url(\"data:image/webp;base64," + base64_encode(WEBP_BYTES) + "\")") != std::string::npos);
+	CHECK(css.find("@import") == std::string::npos);
+	size_t urls = 0;
+	for (size_t pos = css.find("url("); pos != std::string::npos; pos = css.find("url(", pos + 1)) {
+		++urls;
+		CHECK(css.compare(pos, 10, "url(\"data:") == 0);
+	}
+	CHECK(urls == 1);
 }
 
 // 宣言 property を含む規則のセレクターをすべて返す
@@ -462,7 +620,10 @@ int main()
 	test_css_string();
 	test_user_id();
 	test_image_format();
-	test_image_size_limits();
+	test_source_limits();
+	test_embed_steps();
+	test_embed_plan_per_image();
+	test_embed_plan_total();
 	test_base64();
 	test_voice_sections_table();
 	test_css_has_no_external_resources();

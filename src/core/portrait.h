@@ -27,10 +27,14 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 namespace sspot::core {
 
-// 画像の大きさの上限 (元のファイルのバイト数)。仮決めのため、B1 の結果で変えるときはここだけを直す。
+// 埋め込む画像の大きさの上限。元の画像ではなく、縮小して書き出した後の画像に掛ける。
 // 1 枚の上限は base64 にして約 140 万文字で、Chromium の URL の上限 2,097,152 文字を下回る
 inline constexpr std::size_t MAX_IMAGE_BYTES = 1048576;
 inline constexpr std::size_t MAX_TOTAL_IMAGE_BYTES = 4194304;
+
+// 元の画像の上限。画素を読む前にファイルの大きさと寸法で確かめ、OBS のメモリを使い切らないようにする
+inline constexpr std::size_t MAX_SOURCE_FILE_BYTES = 50 * 1048576;
+inline constexpr unsigned long long MAX_SOURCE_PIXELS = 100000000;
 
 // Discord のユーザー ID の桁数の上限。64 ビットの符号なし整数の最大値が 20 桁のため
 inline constexpr std::size_t MAX_USER_ID_DIGITS = 20;
@@ -42,6 +46,7 @@ enum class ImageFormat {
 	Unknown,
 	Png,
 	Jpeg,
+	Webp,
 };
 
 // ファイルの先頭のバイト列から形式を判定する
@@ -58,18 +63,19 @@ enum class ImageProblem {
 	UnsupportedExtension, // 拡張子が .png、.jpg、.jpeg のどれでもない
 	UnknownContent,       // 中身が png でも jpg でもない
 	ExtensionMismatch,    // 拡張子と中身の形式が違う
-	TooLarge,             // 1 枚の上限を超える
-	TotalTooLarge,        // 全員分の合計が上限を超える
+	TooLarge,             // ファイルが元の画像の上限を超える
+	TooManyPixels,        // 寸法が元の画像の画素数の上限を超える
+	Unreadable,           // ファイルを開けない、または画像として読めない
 };
 
-// ファイルを読む前に大きさだけを確かめる
-ImageProblem check_image_size(std::size_t size);
+// 元の画像のファイルの大きさを、読む前に確かめる
+ImageProblem check_source_size(std::size_t size);
 
-// 登録済みの画像の大きさの一覧に 1 枚を足したときの合計を確かめる。差し替えのときは、差し替える前の画像を一覧から除いて渡す
-ImageProblem check_total_image_size(const std::vector<std::size_t> &registered_sizes, std::size_t added_size);
+// 元の画像の寸法を、画素を読む前に確かめる。寸法が分からないときは 0 以下を渡す
+ImageProblem check_source_dimensions(long long width, long long height);
 
-// 1 枚の画像のファイル名と中身を確かめる。大きさ、拡張子、中身、両者の一致の順に確かめ、最初の問題を返す
-ImageProblem check_image(std::string_view file_name, std::string_view bytes);
+// 1 枚の画像のファイル名と先頭のバイト列を確かめる。拡張子、中身、両者の一致の順に確かめ、最初の問題を返す
+ImageProblem check_image(std::string_view file_name, std::string_view header);
 
 std::string base64_encode(std::string_view bytes);
 
@@ -105,7 +111,7 @@ EntryCheck check_entries(const std::vector<PortraitEntry> &entries);
 struct Portrait {
 	std::string user_id;
 	ImageFormat format = ImageFormat::Unknown;
-	std::string base64; // 画像のファイルの中身を base64 にしたもの
+	std::string base64; // 埋め込む画像を base64 にしたもの
 	int order = 0;      // 表示の順。小さいほど前
 	std::string memo;   // ドックの中だけで使う覚え書きの名前。CSS には出さない
 };

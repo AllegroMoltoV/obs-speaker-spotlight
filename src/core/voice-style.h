@@ -27,6 +27,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 namespace sspot::core {
 
+// 立ち絵の表示の高さ (px)。埋め込む画像の縮小の基準にも使う
+int avatar_height(const StyleValues &values);
+
 // 設定の値と立ち絵から、ブラウザーソースの管理範囲に書く CSS を作る。
 // ユーザー ID が不正な立ち絵、形式が分からない立ち絵、base64 に使わない文字を含む立ち絵、
 // 先に現れたものと同じユーザー ID の立ち絵は CSS に出さない

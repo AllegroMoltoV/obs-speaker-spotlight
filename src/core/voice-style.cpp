@@ -67,6 +67,11 @@ std::string group_digits(size_t value)
 
 } // namespace
 
+int avatar_height(const StyleValues &values)
+{
+	return css::Reader(voice_sections(), values).number("avatar_height").value_or(150);
+}
+
 std::string generate_css(const StyleValues &values, const std::vector<Portrait> &portraits)
 {
 	const css::Reader reader(voice_sections(), values);
@@ -78,7 +83,7 @@ std::string generate_css(const StyleValues &values, const std::vector<Portrait> 
 	const std::string user = css::under(item, sk::USER);
 	const std::string name = css::under(user, sk::NAME);
 
-	const int height = reader.number("avatar_height").value_or(150);
+	const int height = avatar_height(values);
 	const bool horizontal = reader.text("layout_direction") == "horizontal";
 	const std::vector<const Portrait *> registered = usable_portraits(portraits);
 

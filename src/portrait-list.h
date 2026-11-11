@@ -47,6 +47,8 @@ public:
 	void set_position(int index, int count);
 	QString image_path() const { return image_path_; }
 	void set_image_path(const QString &path);
+	// 最後に埋め込んだ画像の大きさ。空のときは欄を隠す
+	void set_embedded_text(const QString &text);
 
 signals:
 	void changed();
@@ -58,6 +60,7 @@ private:
 	QLineEdit *user_id_edit_{nullptr};
 	QLabel *image_label_{nullptr};
 	QPushButton *choose_button_{nullptr};
+	QLabel *embedded_label_{nullptr};
 	QLineEdit *memo_edit_{nullptr};
 	QToolButton *up_button_{nullptr};
 	QToolButton *down_button_{nullptr};
@@ -74,6 +77,8 @@ public:
 
 	std::vector<core::PortraitEntry> entries() const;
 	void set_entries(const std::vector<core::PortraitEntry> &entries);
+	// 行の並びの順に、最後に埋め込んだ画像の大きさを表示する
+	void set_embedded_texts(const std::vector<QString> &texts);
 
 signals:
 	void changed();

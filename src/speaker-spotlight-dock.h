@@ -18,6 +18,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #pragma once
 
+#include "core/portrait-embed.h"
+
 #include <obs.h>
 
 #include <QComboBox>
@@ -27,8 +29,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QToolButton>
 #include <QWidget>
 
+#include <map>
 #include <optional>
 #include <string>
+#include <tuple>
 
 namespace sspot {
 
@@ -79,8 +83,9 @@ private:
 	obs_source_t *selected_source() const;
 	// 選択中のソースに保存した設定を欄へ写す。ソースが無ければ既定に戻す
 	void load_settings();
-	// 欄の設定と立ち絵の画像のファイルから CSS を作る。画像のファイルはその都度読み直して確かめる
-	BuiltCss build_css() const;
+	// 欄の設定と立ち絵の画像のファイルから CSS を作る。画像のファイルはその都度確かめ、縮小して書き出す。
+	// 作れたときは、各行に埋め込んだ画像の大きさを表示する
+	BuiltCss build_css();
 	// generated を選択中のソースの css の管理範囲に書き、元に戻す先を記録する
 	void write_managed_css(const std::string &generated);
 	void update_view();
@@ -105,6 +110,25 @@ private:
 	QLabel *status_label_{nullptr};
 	QToolButton *css_toggle_button_{nullptr};
 	QPlainTextEdit *css_view_{nullptr};
+
+	// 縮小して書き出した画像のキャッシュのキー。元のファイルが変われば更新日時か大きさが変わる
+	struct EmbedKey {
+		QString path;
+		qint64 modified = 0;
+		qint64 size = 0;
+		int target_height = 0;
+		int quality = 0;
+		core::ImageFormat format = core::ImageFormat::Unknown;
+
+		bool operator<(const EmbedKey &other) const
+		{
+			return std::tie(path, modified, size, target_height, quality, format) <
+			       std::tie(other.path, other.modified, other.size, other.target_height, other.quality,
+					other.format);
+		}
+	};
+	// 同じ条件の再適用で縮小と書き出しを繰り返さないためのキャッシュ。直前の build_css() で使った分だけを残す
+	std::map<EmbedKey, core::EncodedImage> embed_cache_;
 };
 
 } // namespace sspot

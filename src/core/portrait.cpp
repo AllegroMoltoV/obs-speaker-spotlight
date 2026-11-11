@@ -64,6 +64,9 @@ ImageFormat detect_image_format(std::string_view bytes)
 		return ImageFormat::Png;
 	if (starts_with(bytes, JPEG_SIGNATURE))
 		return ImageFormat::Jpeg;
+	// RIFF の後ろ 4 バイトはファイルの長さ
+	if (bytes.size() >= 12 && starts_with(bytes, "RIFF") && bytes.substr(8, 4) == "WEBP")
+		return ImageFormat::Webp;
 	return ImageFormat::Unknown;
 }
 
@@ -83,39 +86,35 @@ std::string_view mime_type(ImageFormat format)
 		return "image/png";
 	case ImageFormat::Jpeg:
 		return "image/jpeg";
+	case ImageFormat::Webp:
+		return "image/webp";
 	case ImageFormat::Unknown:
 		break;
 	}
 	return {};
 }
 
-ImageProblem check_image_size(std::size_t size)
+ImageProblem check_source_size(std::size_t size)
 {
-	return size > MAX_IMAGE_BYTES ? ImageProblem::TooLarge : ImageProblem::None;
+	return size > MAX_SOURCE_FILE_BYTES ? ImageProblem::TooLarge : ImageProblem::None;
 }
 
-ImageProblem check_total_image_size(const std::vector<std::size_t> &registered_sizes, std::size_t added_size)
+ImageProblem check_source_dimensions(long long width, long long height)
 {
-	if (added_size > MAX_TOTAL_IMAGE_BYTES)
-		return ImageProblem::TotalTooLarge;
-	std::size_t total = added_size;
-	for (const std::size_t size : registered_sizes) {
-		// 足し算の桁あふれを避けるため、残りの枠と比べる
-		if (size > MAX_TOTAL_IMAGE_BYTES - total)
-			return ImageProblem::TotalTooLarge;
-		total += size;
-	}
-	return ImageProblem::None;
+	if (width <= 0 || height <= 0)
+		return ImageProblem::Unreadable;
+	const auto w = static_cast<unsigned long long>(width);
+	const auto h = static_cast<unsigned long long>(height);
+	// 掛け算の桁あふれを避けるため、割り算で比べる
+	return w > MAX_SOURCE_PIXELS / h ? ImageProblem::TooManyPixels : ImageProblem::None;
 }
 
-ImageProblem check_image(std::string_view file_name, std::string_view bytes)
+ImageProblem check_image(std::string_view file_name, std::string_view header)
 {
-	if (check_image_size(bytes.size()) != ImageProblem::None)
-		return ImageProblem::TooLarge;
 	const ImageFormat by_name = format_from_file_name(file_name);
 	if (by_name == ImageFormat::Unknown)
 		return ImageProblem::UnsupportedExtension;
-	const ImageFormat by_content = detect_image_format(bytes);
+	const ImageFormat by_content = detect_image_format(header);
 	if (by_content == ImageFormat::Unknown)
 		return ImageProblem::UnknownContent;
 	return by_name == by_content ? ImageProblem::None : ImageProblem::ExtensionMismatch;
