@@ -449,7 +449,7 @@ void SpeakerSpotlightDock::write_managed_css(const std::string &generated)
 	}
 
 	// 元に戻す先は、プラグインが最初に書き換える前の css にする
-	save_apply_record(source, state.has_previous ? state.previous_css : current, *updated);
+	save_apply_record(source, state.has_previous ? state.previous_css : current, core::css_fingerprint(*updated));
 	set_source_css(source, *updated);
 	obs_log(LOG_INFO, "applied CSS to browser source '%s' (%zu bytes)", name.toUtf8().constData(), updated->size());
 	obs_source_release(source);
@@ -516,7 +516,7 @@ void SpeakerSpotlightDock::on_undo()
 	const SourceState state = load_source_state(source);
 	const std::string current = get_source_css(source);
 
-	switch (core::decide_undo(state.has_previous, current, state.applied_css)) {
+	switch (core::decide_undo(state.has_previous, current, state.applied_fingerprint)) {
 	case core::UndoDecision::Nothing:
 		obs_source_release(source);
 		set_status(text("Undo.Nothing"));

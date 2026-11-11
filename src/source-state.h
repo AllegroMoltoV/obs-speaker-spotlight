@@ -31,12 +31,12 @@ namespace sspot {
 // ブラウザーソースごとの状態。private settings の "speaker_spotlight" に置き、シーンコレクションと一緒に保存される
 struct SourceState {
 	bool has_previous = false;
-	std::string previous_css; // 最後の適用の前の css
-	std::string applied_css;  // 最後の適用の直後の css
+	std::string previous_css;        // プラグインが最初に書き換える前の css
+	std::string applied_fingerprint; // 最後の適用の直後の css の指紋 (core::css_fingerprint)
 };
 
 SourceState load_source_state(obs_source_t *source);
-void save_apply_record(obs_source_t *source, const std::string &previous_css, const std::string &applied_css);
+void save_apply_record(obs_source_t *source, const std::string &previous_css, const std::string &applied_fingerprint);
 void clear_apply_record(obs_source_t *source);
 
 // 見た目の設定。private settings の speaker_spotlight の "style" に置く

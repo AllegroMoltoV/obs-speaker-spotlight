@@ -134,9 +134,15 @@ void test_replace_ignores_other_plugin_markers()
 
 void test_undo_decision()
 {
-	CHECK(decide_undo(false, "a", "a") == UndoDecision::Nothing);
-	CHECK(decide_undo(true, "applied", "applied") == UndoDecision::Restore);
-	CHECK(decide_undo(true, "applied + edit", "applied") == UndoDecision::RestoreWithConfirm);
+	const std::string applied = css_fingerprint("applied");
+	CHECK(decide_undo(false, "applied", applied) == UndoDecision::Nothing);
+	CHECK(decide_undo(true, "applied", applied) == UndoDecision::Restore);
+	CHECK(decide_undo(true, "applied + edit", applied) == UndoDecision::RestoreWithConfirm);
+	// 同じ長さで 1 文字だけ違う書き換えも見分ける
+	CHECK(decide_undo(true, "applieD", applied) == UndoDecision::RestoreWithConfirm);
+	// FNV-1a 64 の既知の値。指紋の形式はシーンコレクションに保存されるため、変わらないことを確かめる
+	CHECK(css_fingerprint("") == "0:cbf29ce484222325");
+	CHECK(css_fingerprint("a") == "1:af63dc4c8601ec8c");
 }
 
 void test_streamkit_voice_url()

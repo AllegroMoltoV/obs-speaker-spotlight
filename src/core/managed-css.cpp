@@ -18,6 +18,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include "managed-css.h"
 
+#include <cstdint>
+#include <cstdio>
+
 namespace sspot::core {
 
 namespace {
@@ -92,11 +95,25 @@ std::optional<std::string> replace_block(std::string_view css, std::string_view 
 	return std::nullopt;
 }
 
-UndoDecision decide_undo(bool has_previous, std::string_view current_css, std::string_view applied_css)
+std::string css_fingerprint(std::string_view css)
+{
+	// FNV-1a 64 ビット。利用者の手による書き換えを見分けるためのもので、改ざんへの耐性は要らない
+	std::uint64_t hash = 14695981039346656037ull;
+	for (const unsigned char c : css) {
+		hash ^= c;
+		hash *= 1099511628211ull;
+	}
+	char hex[17];
+	std::snprintf(hex, sizeof(hex), "%016llx", static_cast<unsigned long long>(hash));
+	return std::to_string(css.size()) + ":" + hex;
+}
+
+UndoDecision decide_undo(bool has_previous, std::string_view current_css, std::string_view applied_fingerprint)
 {
 	if (!has_previous)
 		return UndoDecision::Nothing;
-	return current_css == applied_css ? UndoDecision::Restore : UndoDecision::RestoreWithConfirm;
+	return css_fingerprint(current_css) == applied_fingerprint ? UndoDecision::Restore
+								   : UndoDecision::RestoreWithConfirm;
 }
 
 } // namespace sspot::core
