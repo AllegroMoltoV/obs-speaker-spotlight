@@ -18,12 +18,17 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #pragma once
 
+#include "core/pending-apply.h"
+
 #include <obs.h>
 
 #include <QComboBox>
 #include <QLabel>
 #include <QPushButton>
+#include <QTimer>
 #include <QWidget>
+
+#include <string>
 
 namespace sspot {
 
@@ -51,6 +56,12 @@ public:
 
 	void refresh_sources();
 	void clear_sources();
+	// 反映待ちの変更を、待ちを切り上げて元のソースへすぐ書き込む。ソースが既に無ければ何もしない
+	void flush_pending();
+
+protected:
+	// OBS のメインウィンドウの閉じる操作を受け、終了の保存より前に反映待ちを書き込む
+	bool eventFilter(QObject *watched, QEvent *event) override;
 
 private slots:
 	void on_source_changed();
@@ -58,7 +69,6 @@ private slots:
 	void on_user_id_changed();
 	void on_portrait_changed();
 	void on_create_source();
-	void on_apply();
 	void on_preset_save();
 	void on_preset_load();
 	void on_preset_delete();
@@ -71,6 +81,10 @@ private:
 	// source に保存した設定から CSS を作り、source の css の管理範囲に書く。ユーザー ID が空なら管理範囲を外す。
 	// 欄の操作はそのたびにソースへ保存するため、欄ではなくソースの設定を読む
 	void apply_to_source(obs_source_t *source);
+	// 選択中のソースを反映待ちにし、待ちを始め直す
+	void schedule_apply();
+	// ソースが既に無いとき、削除済みのときは何もしない
+	void apply_by_uuid(const std::string &uuid);
 	void update_view();
 	void refresh_presets(const QString &select_name = {});
 	void set_status(const QString &message);
@@ -86,8 +100,9 @@ private:
 	QPushButton *preset_load_button_{nullptr};
 	QPushButton *preset_save_button_{nullptr};
 	QPushButton *preset_delete_button_{nullptr};
-	QPushButton *apply_button_{nullptr};
 	QLabel *status_label_{nullptr};
+	QTimer apply_timer_;
+	core::PendingApply pending_;
 };
 
 } // namespace sspot

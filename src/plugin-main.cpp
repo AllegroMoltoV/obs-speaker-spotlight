@@ -51,6 +51,9 @@ static void register_dock()
 	}
 	obs_log(LOG_INFO, "Dock registered successfully");
 
+	// 終了の時の OBS_FRONTEND_EVENT_EXIT はソースを片付けた後に届くため、閉じる操作の時点で反映待ちを書き込む
+	main_window->installEventFilter(g_dock);
+
 	// OBS restores DockState before this event, then hides newly added docks.
 	config_t *user_config = obs_frontend_get_user_config();
 	if (user_config) {
@@ -73,6 +76,9 @@ static void on_frontend_event(enum obs_frontend_event event, void *private_data)
 	if (event == OBS_FRONTEND_EVENT_FINISHED_LOADING) {
 		// Create dock after OBS UI is ready
 		register_dock();
+	} else if (event == OBS_FRONTEND_EVENT_SCENE_COLLECTION_CHANGING && g_dock) {
+		// 切り替え前のシーンコレクションが保存される前に書き込む。CLEANUP ではソースが既に外されている
+		g_dock->flush_pending();
 	} else if (event == OBS_FRONTEND_EVENT_SCENE_COLLECTION_CLEANUP && g_dock) {
 		g_dock->clear_sources();
 	} else if (event == OBS_FRONTEND_EVENT_SCENE_COLLECTION_CHANGED && g_dock) {

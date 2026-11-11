@@ -140,7 +140,8 @@ CssUpdate update_css(std::string_view current_css, const StyleValues &values, st
 	}
 	if (!updated)
 		return {CssUpdateProblem::BrokenMarkers, {}};
-	return {CssUpdateProblem::None, std::move(*updated)};
+	const bool changed = *updated != current_css;
+	return {CssUpdateProblem::None, std::move(*updated), changed};
 }
 
 } // namespace sspot::core

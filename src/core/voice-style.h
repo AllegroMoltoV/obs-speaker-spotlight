@@ -46,6 +46,9 @@ enum class CssUpdateProblem {
 struct CssUpdate {
 	CssUpdateProblem problem = CssUpdateProblem::None;
 	std::string css; // problem が None のときの、書き込む css の全文
+	// problem が None で、css が書き込み済みの css と違うときに true。同じ css を書くとページが作り直されるだけのため、
+	// false なら書き込まない
+	bool changed = false;
 };
 
 // 書き込み済みの css に設定を反映した css を作る。user_id が空なら、プラグインの CSS を書かず管理範囲を外す。

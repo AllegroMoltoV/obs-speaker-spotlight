@@ -20,6 +20,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include "core/css-builder.h"
 #include "core/managed-css.h"
+#include "core/pending-apply.h"
 #include "core/portrait-embed.h"
 #include "core/portrait.h"
 #include "core/streamkit-url.h"
@@ -519,6 +520,47 @@ void test_update_css()
 	      CssUpdateProblem::InvalidUserId);
 }
 
+// 書き込み済みと同じ css になるときは、ページを作り直させないよう書き込まない
+void test_update_css_reports_unchanged()
+{
+	const CssUpdate first = update_css(DEFAULT_CSS, max_values(), USER_ID, portrait_of(PNG_BYTES));
+	CHECK(first.changed);
+	const CssUpdate again = update_css(first.css, max_values(), USER_ID, portrait_of(PNG_BYTES));
+	CHECK(again.problem == CssUpdateProblem::None);
+	CHECK(!again.changed);
+	CHECK(update_css(first.css, StyleValues{}, USER_ID, portrait_of(PNG_BYTES)).changed);
+	CHECK(update_css(first.css, max_values(), USER_ID, std::nullopt).changed);
+	CHECK(update_css(first.css, max_values(), "222", portrait_of(PNG_BYTES)).changed);
+	// ID を消すと管理範囲を外す。外した後にもう一度反映しても書かない
+	const CssUpdate removed = update_css(first.css, max_values(), "", std::nullopt);
+	CHECK(removed.changed);
+	CHECK(!update_css(removed.css, max_values(), "", std::nullopt).changed);
+	// 書かないときは changed にしない
+	const std::string broken = DEFAULT_CSS + "\n" + std::string(BLOCK_END);
+	CHECK(!update_css(broken, StyleValues{}, USER_ID, std::nullopt).changed);
+}
+
+// 反映待ちはソースの ID に結び付き、別のソースへ移ると元のソースを書き込む対象として返す
+void test_pending_apply()
+{
+	PendingApply pending;
+	CHECK(!pending.pending());
+	CHECK(!pending.take().has_value());
+
+	// 同じソースへの操作の繰り返しは 1 回の反映にまとめる
+	CHECK(!pending.mark("a").has_value());
+	CHECK(!pending.mark("a").has_value());
+	CHECK(pending.pending());
+	CHECK(pending.take() == std::optional<std::string>("a"));
+	CHECK(!pending.pending());
+	CHECK(!pending.take().has_value());
+
+	// 別のソースへの操作は、前のソースを先に書き込ませる
+	pending.mark("a");
+	CHECK(pending.mark("b") == std::optional<std::string>("a"));
+	CHECK(pending.take() == std::optional<std::string>("b"));
+}
+
 // 名前の背景が立ち絵や隣の参加者に重ならないよう、表示するときは span に行の高さを取らせる
 void test_name_takes_its_own_line_height()
 {
@@ -560,6 +602,8 @@ int main()
 	test_css_has_no_external_resources();
 	test_css_shows_only_registered_user();
 	test_update_css();
+	test_update_css_reports_unchanged();
+	test_pending_apply();
 	test_name_takes_its_own_line_height();
 
 	if (failures > 0) {

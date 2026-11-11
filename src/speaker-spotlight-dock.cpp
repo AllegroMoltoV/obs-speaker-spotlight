@@ -30,6 +30,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <obs-module.h>
 #include <plugin-support.h>
 
+#include <QEvent>
 #include <QGridLayout>
 #include <QHBoxLayout>
 #include <QInputDialog>
@@ -130,11 +131,6 @@ SpeakerSpotlightDock::SpeakerSpotlightDock(QWidget *parent) : QWidget(parent)
 	preset_layout->addLayout(preset_buttons, 1, 1);
 	preset_layout->setColumnStretch(1, 1);
 
-	apply_button_ = new QPushButton(text("Apply"), content);
-	auto *action_row = new QHBoxLayout();
-	action_row->addStretch();
-	action_row->addWidget(apply_button_);
-
 	status_label_ = new QLabel(content);
 	status_label_->setWordWrap(true);
 
@@ -144,7 +140,6 @@ SpeakerSpotlightDock::SpeakerSpotlightDock(QWidget *parent) : QWidget(parent)
 	layout->addWidget(speaker_section_);
 	layout->addWidget(panel_);
 	layout->addWidget(preset_row_);
-	layout->addLayout(action_row);
 	layout->addWidget(status_label_);
 	layout->addStretch();
 
@@ -170,7 +165,9 @@ SpeakerSpotlightDock::SpeakerSpotlightDock(QWidget *parent) : QWidget(parent)
 	connect(speaker_, &SpeakerForm::user_id_changed, this, &SpeakerSpotlightDock::on_user_id_changed);
 	connect(speaker_, &SpeakerForm::portrait_changed, this, &SpeakerSpotlightDock::on_portrait_changed);
 	connect(panel_, &SettingsPanel::changed, this, &SpeakerSpotlightDock::on_settings_changed);
-	connect(apply_button_, &QPushButton::clicked, this, &SpeakerSpotlightDock::on_apply);
+	apply_timer_.setSingleShot(true);
+	apply_timer_.setInterval(core::APPLY_DELAY_MS);
+	connect(&apply_timer_, &QTimer::timeout, this, &SpeakerSpotlightDock::flush_pending);
 	connect(preset_load_button_, &QPushButton::clicked, this, &SpeakerSpotlightDock::on_preset_load);
 	connect(preset_save_button_, &QPushButton::clicked, this, &SpeakerSpotlightDock::on_preset_save);
 	connect(preset_delete_button_, &QPushButton::clicked, this, &SpeakerSpotlightDock::on_preset_delete);
@@ -198,14 +195,17 @@ void SpeakerSpotlightDock::refresh_sources()
 	source_combo_->setCurrentIndex(source_combo_->findData(selected_uuid));
 	source_combo_->blockSignals(false);
 
-	// 選んでいたソースが消えたときは、そのソースの設定を欄に残さない
-	if (source_combo_->currentData().toString() != selected_uuid)
+	// 選んでいたソースが消えたときは、反映待ちを書き込み、そのソースの設定を欄に残さない
+	if (source_combo_->currentData().toString() != selected_uuid) {
+		flush_pending();
 		load_settings();
+	}
 	update_view();
 }
 
 void SpeakerSpotlightDock::clear_sources()
 {
+	flush_pending();
 	source_combo_->blockSignals(true);
 	source_combo_->clear();
 	source_combo_->blockSignals(false);
@@ -241,14 +241,13 @@ void SpeakerSpotlightDock::update_view()
 	speaker_section_->setEnabled(has_source);
 	panel_->setEnabled(has_source);
 	preset_row_->setEnabled(has_source);
-	apply_button_->setEnabled(has_source);
 	if (!source) {
 		url_warning_label_->clear();
 		url_warning_label_->setVisible(false);
 		return;
 	}
 
-	// StreamKit の URL の形が変わっても使い続けられるよう、警告だけを出して適用は止めない
+	// StreamKit の URL の形が変わっても使い続けられるよう、警告だけを出して反映は止めない
 	const bool streamkit = core::is_streamkit_voice_url(get_source_url(source));
 	url_warning_label_->setText(streamkit ? QString() : text("UrlWarning"));
 	url_warning_label_->setVisible(!streamkit);
@@ -263,17 +262,19 @@ void SpeakerSpotlightDock::set_status(const QString &message)
 void SpeakerSpotlightDock::on_source_changed()
 {
 	set_status({});
+	flush_pending();
 	load_settings();
 	update_view();
 }
 
 void SpeakerSpotlightDock::on_settings_changed()
 {
-	// 設定は操作のたびにソースへ保存する。css を書き換えるとページが読み込み直されるため、適用はボタンでだけ行う
+	// 設定は操作のたびにソースへ保存し、css への反映は待ちの後にまとめて行う
 	obs_source_t *source = selected_source();
 	if (source) {
 		save_style(source, panel_->values());
 		obs_source_release(source);
+		schedule_apply();
 	}
 }
 
@@ -283,6 +284,7 @@ void SpeakerSpotlightDock::on_user_id_changed()
 	if (source) {
 		save_user_id(source, speaker_->user_id());
 		obs_source_release(source);
+		schedule_apply();
 	}
 }
 
@@ -292,6 +294,7 @@ void SpeakerSpotlightDock::on_portrait_changed()
 	if (source) {
 		save_portrait(source, speaker_->portrait());
 		obs_source_release(source);
+		schedule_apply();
 	}
 }
 
@@ -329,7 +332,7 @@ void SpeakerSpotlightDock::apply_to_source(obs_source_t *source)
 		set_status(text("Portrait.InvalidUserId").arg(QString::number(core::MAX_USER_ID_DIGITS)));
 		return;
 	}
-	if (update.css == current) {
+	if (!update.changed) {
 		set_status(text("Apply.Unchanged").arg(name));
 		return;
 	}
@@ -340,16 +343,40 @@ void SpeakerSpotlightDock::apply_to_source(obs_source_t *source)
 	set_status(text(settings.user_id.empty() ? "Apply.Removed" : "Apply.Done").arg(name));
 }
 
-void SpeakerSpotlightDock::on_apply()
+void SpeakerSpotlightDock::schedule_apply()
 {
-	obs_source_t *source = selected_source();
-	if (!source) {
-		set_status(text("SourceNotFound"));
-		refresh_sources();
+	const QString uuid = source_combo_->currentData().toString();
+	if (uuid.isEmpty())
 		return;
-	}
-	apply_to_source(source);
+	if (const auto previous = pending_.mark(uuid.toStdString()))
+		apply_by_uuid(*previous);
+	set_status(text("Apply.Pending"));
+	apply_timer_.start();
+}
+
+void SpeakerSpotlightDock::flush_pending()
+{
+	apply_timer_.stop();
+	if (const auto uuid = pending_.take())
+		apply_by_uuid(*uuid);
+}
+
+void SpeakerSpotlightDock::apply_by_uuid(const std::string &uuid)
+{
+	obs_source_t *source = obs_get_source_by_uuid(uuid.c_str());
+	if (!source)
+		return;
+	if (!obs_source_removed(source))
+		apply_to_source(source);
 	obs_source_release(source);
+}
+
+bool SpeakerSpotlightDock::eventFilter(QObject *watched, QEvent *event)
+{
+	// 閉じる操作が取り消されても、書き込みが早まるだけで害はない
+	if (event->type() == QEvent::Close)
+		flush_pending();
+	return QWidget::eventFilter(watched, event);
 }
 
 void SpeakerSpotlightDock::refresh_presets(const QString &select_name)
