@@ -17,6 +17,7 @@ context compaction で文脈が失われた場合は、この索引から必要�
 | ブラウザーソースの大きさの自動の調整: 緑の枠の分と、ローカルのページでの外寸の計測 | `docs/reports/2026-11-11-source-size.md` |
 | 開発のセッションによる OBS での細かい動作確認 | `docs/reports/2026-11-11-dev-checks.md` |
 | P6: 1 人 1 ソースと自動の反映の OBS での確認 | `docs/reports/2026-11-11-p6-checks.md` |
+| Q4: 名前の削除・高さの上限・大きさの自動の調整の OBS での確認 | `docs/reports/2026-11-11-q4-checks.md` |
 | 実行ログ (生の出力。git 追跡対象外) | `.logs/` |
 | 実行ログ (残す価値があると判断したもの) | `docs/logs/` |
 | 計画と決定事項 (Beads 使用時の正本) | `bd show <親課題>` |
