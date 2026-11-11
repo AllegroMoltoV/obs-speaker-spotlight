@@ -18,6 +18,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include "portrait-list.h"
 
+#include "message-box.h"
 #include "portrait-image.h"
 
 #include <obs-module.h>
@@ -27,7 +28,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QFileInfo>
 #include <QFormLayout>
 #include <QHBoxLayout>
-#include <QMessageBox>
 #include <QRegularExpression>
 #include <QRegularExpressionValidator>
 
@@ -265,8 +265,8 @@ void PortraitList::choose_image(PortraitRow *row)
 	const QFileInfo info(path);
 	const core::ImageProblem problem = inspect_source_image(path);
 	if (problem != core::ImageProblem::None) {
-		QMessageBox::warning(this, text("Portrait.ChooseTitle"),
-				     text("Portrait.Rejected").arg(info.fileName(), image_problem_text(problem)));
+		show_warning(this, text("Portrait.ChooseTitle"),
+			     text("Portrait.Rejected").arg(info.fileName(), image_problem_text(problem)));
 		return;
 	}
 

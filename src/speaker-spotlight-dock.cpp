@@ -23,6 +23,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "core/streamkit-url.h"
 #include "core/voice-style.h"
 #include "create-source-dialog.h"
+#include "message-box.h"
 #include "portrait-image.h"
 #include "portrait-list.h"
 #include "preset-store.h"
@@ -38,7 +39,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QGridLayout>
 #include <QHBoxLayout>
 #include <QInputDialog>
-#include <QMessageBox>
 #include <QScrollArea>
 #include <QScrollBar>
 #include <QString>
@@ -487,19 +487,23 @@ void SpeakerSpotlightDock::refresh_presets(const QString &select_name)
 
 void SpeakerSpotlightDock::on_preset_save()
 {
-	bool ok = false;
-	const QString name = QInputDialog::getText(this, text("Preset.SaveTitle"), text("Preset.SaveName"),
-						   QLineEdit::Normal, preset_combo_->currentText(), &ok)
-				     .trimmed();
-	if (!ok || name.isEmpty())
+	QInputDialog dialog(this);
+	dialog.setWindowTitle(text("Preset.SaveTitle"));
+	dialog.setLabelText(text("Preset.SaveName"));
+	dialog.setTextValue(preset_combo_->currentText());
+	dialog.setOkButtonText(text("Dialog.OK"));
+	dialog.setCancelButtonText(text("Dialog.Cancel"));
+	if (dialog.exec() != QDialog::Accepted)
+		return;
+	const QString name = dialog.textValue().trimmed();
+	if (name.isEmpty())
 		return;
 
 	std::vector<Preset> presets = load_presets();
 	const std::string key = name.toStdString();
 	auto it = std::find_if(presets.begin(), presets.end(), [&](const Preset &p) { return p.name == key; });
 	if (it != presets.end()) {
-		if (QMessageBox::question(this, text("Preset.SaveTitle"), text("Preset.Overwrite").arg(name)) !=
-		    QMessageBox::Yes)
+		if (!ask_yes_no(this, text("Preset.SaveTitle"), text("Preset.Overwrite").arg(name)))
 			return;
 		it->values = panel_->values();
 		it->portraits = portraits_->entries();
@@ -538,7 +542,7 @@ void SpeakerSpotlightDock::on_preset_delete()
 	if (preset_combo_->currentIndex() < 0)
 		return;
 	const QString name = preset_combo_->currentText();
-	if (QMessageBox::question(this, text("Preset"), text("Preset.ConfirmDelete").arg(name)) != QMessageBox::Yes)
+	if (!ask_yes_no(this, text("Preset"), text("Preset.ConfirmDelete").arg(name)))
 		return;
 	std::vector<Preset> presets = load_presets();
 	presets.erase(std::remove_if(presets.begin(), presets.end(),

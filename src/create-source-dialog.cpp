@@ -19,13 +19,13 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "create-source-dialog.h"
 
 #include "core/streamkit-url.h"
+#include "message-box.h"
 
 #include <obs-frontend-api.h>
 #include <obs-module.h>
 #include <plugin-support.h>
 
 #include <QFormLayout>
-#include <QMessageBox>
 #include <QPushButton>
 #include <QVBoxLayout>
 
@@ -76,6 +76,7 @@ CreateSourceDialog::CreateSourceDialog(QWidget *parent) : QDialog(parent)
 
 	buttons_ = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
 	buttons_->button(QDialogButtonBox::Ok)->setText(text("CreateSource.Create"));
+	buttons_->button(QDialogButtonBox::Cancel)->setText(text("Dialog.Cancel"));
 
 	auto *form = new QFormLayout();
 	form->addRow(text("CreateSource.Url"), url_edit_);
@@ -119,7 +120,7 @@ void CreateSourceDialog::create_source()
 	obs_scene_t *scene = scene_source ? obs_scene_from_source(scene_source) : nullptr;
 	if (!scene) {
 		obs_source_release(scene_source);
-		QMessageBox::warning(this, windowTitle(), text("CreateSource.NoScene"));
+		show_warning(this, windowTitle(), text("CreateSource.NoScene"));
 		return;
 	}
 
@@ -141,7 +142,7 @@ void CreateSourceDialog::create_source()
 	obs_source_release(scene_source);
 
 	if (created_uuid_.isEmpty()) {
-		QMessageBox::warning(this, windowTitle(), text("CreateSource.Failed"));
+		show_warning(this, windowTitle(), text("CreateSource.Failed"));
 		return;
 	}
 	accept();
