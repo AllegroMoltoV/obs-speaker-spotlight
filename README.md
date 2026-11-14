@@ -166,6 +166,10 @@ AllegroMoltoV - https://www.allegromoltov.jp
 
 ## Changelog / 更新情報
 
+### v1.0.2
+
+- 配信プラグイン倉庫くんに表示名と載せる OS を伝える宣言ファイル (.soko-kun/config.json) を足しました。macOS と Linux の配布物は動作を確かめていないため、倉庫くんには Windows の配布物だけを載せます。リポジトリの名前を obs-speaker-spotlight から speaker-spotlight に変えました。プラグインの動作は v1.0.1 と同じです。
+
 ### v1.0.1
 
 - リリースの配布物にビルドの来歴の証明 (GitHub Artifact Attestation) を付けるようにしました。プラグインの動作は v1.0.0 と同じです。
